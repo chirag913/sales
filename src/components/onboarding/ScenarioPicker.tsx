@@ -16,6 +16,12 @@ const DIFFICULTY_STYLE: Record<Scenario["difficulty"], string> = {
 };
 
 export function ScenarioPicker({ scenarios, onSelect, onBack }: ScenarioPickerProps) {
+  function handleRandomSelect() {
+    if (scenarios.length === 0) return;
+    const randomScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+    onSelect(randomScenario);
+  }
+
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-16">
       <button
@@ -54,6 +60,18 @@ export function ScenarioPicker({ scenarios, onSelect, onBack }: ScenarioPickerPr
             <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500">Objective: {scenario.objective}</p>
           </button>
         ))}
+
+        <button
+          type="button"
+          onClick={handleRandomSelect}
+          className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-zinc-300 bg-transparent p-5 text-center text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
+        >
+          <span className="text-2xl" aria-hidden>
+            🎲
+          </span>
+          <span className="text-base font-semibold">Random</span>
+          <span className="text-sm">Let it pick your challenge</span>
+        </button>
       </div>
     </div>
   );
