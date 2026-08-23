@@ -3,28 +3,53 @@
 import { useEffect, useState } from "react";
 import { HeroInput, HeroInputValue } from "@/components/onboarding/HeroInput";
 import { ProfileReview } from "@/components/onboarding/ProfileReview";
+import { ReadyToCall } from "@/components/onboarding/ReadyToCall";
+import { ScenarioPicker } from "@/components/onboarding/ScenarioPicker";
 import { loadSalesProfile, saveSalesProfile } from "@/lib/storage/localProfile";
-import { clearTrainingProfile, loadTrainingProfile, saveTrainingProfile } from "@/lib/storage/localTrainingProfile";
+import {
+  clearTrainingProfile,
+  loadScenarios,
+  loadTrainingProfile,
+  saveScenarios,
+  saveTrainingProfile,
+} from "@/lib/storage/localTrainingProfile";
 import { applyTrainingProfileToSalesProfile } from "@/lib/profile/sync";
-import { emptySalesProfile, TrainingProfile } from "@/lib/types";
+import { emptySalesProfile, Scenario, TrainingProfile } from "@/lib/types";
 
-type Step = "input" | "review";
+type Step = "input" | "review" | "scenarios" | "ready";
 
 export function TrainingSetup() {
   const [step, setStep] = useState<Step>("input");
   const [profile, setProfile] = useState<TrainingProfile | null>(null);
+  const [scenarios, setScenarios] = useState<Scenario[] | null>(null);
+  const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [generatingScenarios, setGeneratingScenarios] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scenarioError, setScenarioError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const existing = loadTrainingProfile();
-    if (existing) {
-      setProfile(existing);
-      setStep("review");
+    const existingProfile = loadTrainingProfile();
+    if (existingProfile) {
+      setProfile(existingProfile);
+      const existingScenarios = loadScenarios();
+      if (existingScenarios && existingScenarios.length > 0) {
+        setScenarios(existingScenarios);
+        setStep("scenarios");
+      } else {
+        setStep("review");
+      }
     }
     setLoaded(true);
   }, []);
+
+  function persistProfile(next: TrainingProfile) {
+    setProfile(next);
+    saveTrainingProfile(next);
+    const existingSales = loadSalesProfile() ?? emptySalesProfile();
+    saveSalesProfile(applyTrainingProfileToSalesProfile(next, existingSales));
+  }
 
   async function handleGenerate(input: HeroInputValue) {
     setError(null);
@@ -40,10 +65,7 @@ export function TrainingSetup() {
         throw new Error(body?.error ?? "Failed to generate training profile.");
       }
       const generated: TrainingProfile = await res.json();
-      setProfile(generated);
-      saveTrainingProfile(generated);
-      const existingSales = loadSalesProfile() ?? emptySalesProfile();
-      saveSalesProfile(applyTrainingProfileToSalesProfile(generated, existingSales));
+      persistProfile(generated);
       setStep("review");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -52,17 +74,72 @@ export function TrainingSetup() {
     }
   }
 
+  async function handleConfirmProfile() {
+    if (!profile) return;
+    setScenarioError(null);
+    setGeneratingScenarios(true);
+    try {
+      const res = await fetch("/api/scenarios/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? "Failed to generate scenarios.");
+      }
+      const generated: Scenario[] = await res.json();
+      setScenarios(generated);
+      saveScenarios(generated);
+      setStep("scenarios");
+    } catch (err) {
+      setScenarioError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setGeneratingScenarios(false);
+    }
+  }
+
+  function handleSelectScenario(scenario: Scenario) {
+    setSelectedScenario(scenario);
+    setStep("ready");
+  }
+
+  function handleBackToScenarios() {
+    setSelectedScenario(null);
+    setStep("scenarios");
+  }
+
   function handleStartOver() {
     clearTrainingProfile();
     setProfile(null);
+    setScenarios(null);
+    setSelectedScenario(null);
     setError(null);
+    setScenarioError(null);
     setStep("input");
   }
 
   if (!loaded) return null;
 
+  if (step === "ready" && profile && selectedScenario) {
+    return <ReadyToCall profile={profile} scenario={selectedScenario} onBack={handleBackToScenarios} />;
+  }
+
+  if (step === "scenarios" && profile && scenarios) {
+    return <ScenarioPicker scenarios={scenarios} onSelect={handleSelectScenario} onBack={() => setStep("review")} />;
+  }
+
   if (step === "review" && profile) {
-    return <ProfileReview profile={profile} onStartOver={handleStartOver} />;
+    return (
+      <ProfileReview
+        profile={profile}
+        onChange={persistProfile}
+        onStartOver={handleStartOver}
+        onConfirm={handleConfirmProfile}
+        confirming={generatingScenarios}
+        confirmError={scenarioError}
+      />
+    );
   }
 
   return <HeroInput onSubmit={handleGenerate} loading={generating} error={error} />;

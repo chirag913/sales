@@ -123,3 +123,54 @@ export async function generateTrainingProfile(
   if (!raw) throw new Error("Empty response from model");
   return JSON.parse(raw) as TrainingProfile;
 }
+
+const REFINE_SYSTEM_PROMPT = `You are updating an existing cold-call training profile based on a
+user's natural-language change request.
+
+Rules:
+- You will receive the current training profile as JSON, plus a short instruction describing
+  what to change.
+- Apply the instruction precisely. Keep every field not affected by the instruction exactly as
+  it was.
+- Never invent clients, results, testimonials, offices, guarantees, credentials, pricing, or
+  case studies.
+- If the instruction directly changes a field, set that field's key in "assumptions" to false
+  (the user just told you this directly).
+- If applying the instruction forces you to infer a related change (e.g. removing one ICP
+  segment means recommending a replacement), set that field's assumptions key to true.
+- Keep arrays concise: 3-5 items for icpTitles, additionalCriteria, painPoints, and
+  likelyObjections.
+- salesObjective must remain one of: book_meeting, book_demo, qualify_prospect, make_sale.
+- Return the full, complete updated profile — not a partial diff.`;
+
+export async function refineTrainingProfile(
+  profile: TrainingProfile,
+  instruction: string
+): Promise<TrainingProfile> {
+  const client = getOpenAIClient();
+
+  const userMessage = [
+    `Current training profile:\n${JSON.stringify(profile, null, 2)}`,
+    `Change request: ${instruction}`,
+  ].join("\n\n");
+
+  const response = await client.chat.completions.create({
+    model: TEXT_MODEL,
+    messages: [
+      { role: "system", content: REFINE_SYSTEM_PROMPT },
+      { role: "user", content: userMessage },
+    ],
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "training_profile",
+        strict: true,
+        schema: trainingProfileSchema,
+      },
+    },
+  });
+
+  const raw = response.choices[0]?.message?.content;
+  if (!raw) throw new Error("Empty response from model");
+  return JSON.parse(raw) as TrainingProfile;
+}
