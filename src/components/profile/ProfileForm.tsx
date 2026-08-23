@@ -68,7 +68,13 @@ export function ProfileForm() {
           onChange={(v) => update("offer", "problemSolved", v)}
           type="textarea"
         />
-        <FormField label="Price" value={profile.offer.price} onChange={(v) => update("offer", "price", v)} />
+        <FormField
+          label="Price"
+          value={profile.offer.price}
+          onChange={(v) => update("offer", "price", v)}
+          placeholder="e.g. 1500-3000"
+          prefix="$"
+        />
         <FormField
           label="Pricing model"
           value={profile.offer.pricingModel}
@@ -79,12 +85,14 @@ export function ProfileForm() {
           label="Main outcome"
           value={profile.offer.mainOutcome}
           onChange={(v) => update("offer", "mainOutcome", v)}
+          hint="The single result a client gets from working with you — in one sentence."
         />
         <FormField
           label="Unique selling proposition"
           value={profile.offer.usp}
           onChange={(v) => update("offer", "usp", v)}
           type="textarea"
+          hint="Why a prospect should choose you over any competitor — what makes you different."
         />
       </FormSection>
 
@@ -122,31 +130,66 @@ export function ProfileForm() {
         title="Proof"
         description="Never invent this — the prospect agent will only use what's entered here."
       >
-        <FormField label="US clients" value={profile.proof.usClients} onChange={(v) => update("proof", "usClients", v)} />
+        <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 sm:col-span-2">
+          <input
+            type="checkbox"
+            checked={profile.proof.noClientsYet}
+            onChange={(e) => {
+              setSavedAt(null);
+              setProfile((prev) => ({
+                ...prev,
+                proof: { ...prev.proof, noClientsYet: e.target.checked },
+              }));
+            }}
+            className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:ring-zinc-100"
+          />
+          Just starting / new company — no clients yet
+        </label>
+        <FormField
+          label="US clients"
+          value={profile.proof.usClients}
+          onChange={(v) => update("proof", "usClients", v)}
+          disabled={profile.proof.noClientsYet}
+        />
         <FormField
           label="Number of clients"
           value={profile.proof.numberOfClients}
           onChange={(v) => update("proof", "numberOfClients", v)}
+          disabled={profile.proof.noClientsYet}
         />
         <FormField
           label="Case studies"
           value={profile.proof.caseStudies}
           onChange={(v) => update("proof", "caseStudies", v)}
           type="textarea"
+          disabled={profile.proof.noClientsYet}
         />
-        <FormField label="Results" value={profile.proof.results} onChange={(v) => update("proof", "results", v)} type="textarea" />
+        <FormField
+          label="Results"
+          value={profile.proof.results}
+          onChange={(v) => update("proof", "results", v)}
+          type="textarea"
+          disabled={profile.proof.noClientsYet}
+        />
         <FormField
           label="Testimonials"
           value={profile.proof.testimonials}
           onChange={(v) => update("proof", "testimonials", v)}
           type="textarea"
+          disabled={profile.proof.noClientsYet}
         />
-        <FormField label="Guarantees" value={profile.proof.guarantees} onChange={(v) => update("proof", "guarantees", v)} />
+        <FormField
+          label="Guarantees"
+          value={profile.proof.guarantees}
+          onChange={(v) => update("proof", "guarantees", v)}
+          disabled={profile.proof.noClientsYet}
+        />
         <FormField
           label="Other credibility"
           value={profile.proof.otherCredibility}
           onChange={(v) => update("proof", "otherCredibility", v)}
           type="textarea"
+          disabled={profile.proof.noClientsYet}
         />
       </FormSection>
 

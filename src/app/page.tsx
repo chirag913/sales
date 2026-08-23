@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { TrainingSetup } from "@/components/onboarding/TrainingSetup";
 
 export default function Home() {
-  redirect("/profile");
+  return <TrainingSetup />;
 }

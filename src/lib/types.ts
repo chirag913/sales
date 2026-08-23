@@ -35,6 +35,7 @@ export interface SalesProfile {
     typicalProspect: string;
   };
   proof: {
+    noClientsYet: boolean;
     usClients: string;
     numberOfClients: string;
     caseStudies: string;
@@ -54,12 +55,59 @@ export interface SalesProfile {
   };
 }
 
+export type ProspectMarket = "US" | "UK" | "Canada" | "Australia" | "Other";
+
+export const PROSPECT_MARKET_OPTIONS: { value: ProspectMarket; label: string }[] = [
+  { value: "US", label: "United States" },
+  { value: "UK", label: "United Kingdom" },
+  { value: "Canada", label: "Canada" },
+  { value: "Australia", label: "Australia" },
+  { value: "Other", label: "Other" },
+];
+
+export type TrainingProfileFieldKey =
+  | "market"
+  | "service"
+  | "icpTitles"
+  | "companySizeRange"
+  | "additionalCriteria"
+  | "painPoints"
+  | "likelyObjections"
+  | "salesObjective"
+  | "typicalProspect";
+
+export interface TrainingProfile {
+  market: ProspectMarket;
+  service: string;
+  icpTitles: string[];
+  companySizeRange: string;
+  additionalCriteria: string[];
+  painPoints: string[];
+  likelyObjections: string[];
+  salesObjective: SalesObjective;
+  salesObjectiveDetail: string;
+  typicalProspect: string;
+  assumptions: Partial<Record<TrainingProfileFieldKey, boolean>>;
+}
+
+export type ScenarioDifficulty = "Easy" | "Medium" | "Hard" | "Expert";
+
+export interface Scenario {
+  id: string;
+  icon: string;
+  name: string;
+  description: string;
+  difficulty: ScenarioDifficulty;
+  objective: string;
+}
+
 export function emptySalesProfile(): SalesProfile {
   return {
     company: { name: "", location: "", website: "", yearsOperating: "", teamSize: "" },
     offer: { whatYouSell: "", problemSolved: "", price: "", pricingModel: "", mainOutcome: "", usp: "" },
     targetCustomer: { industry: "", companySize: "", jobTitle: "", country: "United States", typicalProspect: "" },
     proof: {
+      noClientsYet: false,
       usClients: "",
       numberOfClients: "",
       caseStudies: "",

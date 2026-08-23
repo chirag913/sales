@@ -1,4 +1,4 @@
-import { SalesProfile } from "@/lib/types";
+import { emptySalesProfile, SalesProfile } from "@/lib/types";
 
 const STORAGE_KEY = "cct:salesProfile";
 
@@ -7,7 +7,19 @@ export function loadSalesProfile(): SalesProfile | null {
   const raw = window.localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as SalesProfile;
+    const parsed = JSON.parse(raw) as Partial<SalesProfile>;
+    const defaults = emptySalesProfile();
+    // Merge onto defaults so fields added after a profile was saved
+    // (e.g. an older stored profile from before a new field existed)
+    // are never left undefined.
+    return {
+      company: { ...defaults.company, ...parsed.company },
+      offer: { ...defaults.offer, ...parsed.offer },
+      targetCustomer: { ...defaults.targetCustomer, ...parsed.targetCustomer },
+      proof: { ...defaults.proof, ...parsed.proof },
+      salesObjective: parsed.salesObjective ?? defaults.salesObjective,
+      importantInfo: { ...defaults.importantInfo, ...parsed.importantInfo },
+    };
   } catch {
     return null;
   }
