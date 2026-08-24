@@ -4,14 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { CoachPanel } from "@/components/call/CoachPanel";
 import { useRealtimeCall } from "@/lib/realtime/useRealtimeCall";
-import { CoachMode, CoachTip, ProspectIdentity, SalesProfile, Scenario, TrainingProfile } from "@/lib/types";
+import { CoachMode, CoachTip, ProspectIdentity, SalesProfile, Scenario, TranscriptEntry, TrainingProfile } from "@/lib/types";
 
 interface CallScreenProps {
   salesProfile: SalesProfile;
   trainingProfile: TrainingProfile;
   scenario: Scenario;
   identity: ProspectIdentity;
-  onEnd: () => void;
+  onEnd: (transcript: TranscriptEntry[], durationSeconds: number) => void;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -26,8 +26,9 @@ export function CallScreen({ salesProfile, trainingProfile, scenario, identity, 
   const { status, transcript, error, speaking, start, stop } = useRealtimeCall();
   const startedRef = useRef(false);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  const callStartRef = useRef(Date.now());
 
-  const [coachMode, setCoachMode] = useState<CoachMode>("practice");
+  const [coachMode, setCoachMode] = useState<CoachMode>("training");
   const [coachTip, setCoachTip] = useState<CoachTip | null>(null);
   const [coachLoading, setCoachLoading] = useState(false);
   const lastCoachedIdRef = useRef<string | null>(null);
@@ -81,8 +82,9 @@ export function CallScreen({ salesProfile, trainingProfile, scenario, identity, 
   }, [transcript, coachMode, salesProfile, trainingProfile]);
 
   function handleEndCall() {
+    const durationSeconds = Math.round((Date.now() - callStartRef.current) / 1000);
     stop();
-    onEnd();
+    onEnd(transcript, durationSeconds);
   }
 
   const dotClass =

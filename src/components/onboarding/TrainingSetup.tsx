@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CallScreen } from "@/components/call/CallScreen";
+import { ScoreScreen } from "@/components/call/ScoreScreen";
 import { HeroInput, HeroInputValue } from "@/components/onboarding/HeroInput";
 import { ProfileReview } from "@/components/onboarding/ProfileReview";
 import { ReadyToCall } from "@/components/onboarding/ReadyToCall";
@@ -16,9 +17,16 @@ import {
 } from "@/lib/storage/localTrainingProfile";
 import { applyTrainingProfileToSalesProfile } from "@/lib/profile/sync";
 import { generateProspectIdentity } from "@/lib/prospect/identity";
-import { emptySalesProfile, ProspectIdentity, Scenario, TrainingProfile } from "@/lib/types";
+import {
+  CallScoreResult,
+  emptySalesProfile,
+  ProspectIdentity,
+  Scenario,
+  TranscriptEntry,
+  TrainingProfile,
+} from "@/lib/types";
 
-type Step = "input" | "review" | "scenarios" | "ready" | "call";
+type Step = "input" | "review" | "scenarios" | "ready" | "call" | "scoring";
 
 export function TrainingSetup() {
   const [step, setStep] = useState<Step>("input");
@@ -30,6 +38,10 @@ export function TrainingSetup() {
   const [generatingScenarios, setGeneratingScenarios] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scenarioError, setScenarioError] = useState<string | null>(null);
+  const [callDurationSeconds, setCallDurationSeconds] = useState(0);
+  const [scoreResult, setScoreResult] = useState<CallScoreResult | null>(null);
+  const [scoring, setScoring] = useState(false);
+  const [scoringError, setScoringError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -116,9 +128,55 @@ export function TrainingSetup() {
     setStep("scenarios");
   }
 
-  function handleEndCall() {
+  async function runScoring(transcript: TranscriptEntry[], durationSeconds: number, scenario: Scenario, trainingProfile: TrainingProfile) {
+    setScoring(true);
+    setScoringError(null);
+    setScoreResult(null);
+    try {
+      const res = await fetch("/api/score/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript,
+          salesProfile: loadSalesProfile() ?? emptySalesProfile(),
+          trainingProfile,
+          scenario,
+          durationSeconds,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? "Failed to score the call.");
+      }
+      const result: CallScoreResult = await res.json();
+      setScoreResult(result);
+    } catch (err) {
+      setScoringError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setScoring(false);
+    }
+  }
+
+  function handleCallEnded(transcript: TranscriptEntry[], durationSeconds: number) {
+    if (!profile || !selectedScenario) return;
+    setCallDurationSeconds(durationSeconds);
+    setStep("scoring");
+    void runScoring(transcript, durationSeconds, selectedScenario, profile);
+  }
+
+  function handlePracticeAgain() {
+    if (!profile || !selectedScenario) return;
+    setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles));
+    setScoreResult(null);
+    setScoringError(null);
+    setStep("call");
+  }
+
+  function handleScoreDone() {
     setSelectedScenario(null);
     setProspectIdentity(null);
+    setScoreResult(null);
+    setScoringError(null);
     setStep("scenarios");
   }
 
@@ -128,12 +186,28 @@ export function TrainingSetup() {
     setScenarios(null);
     setSelectedScenario(null);
     setProspectIdentity(null);
+    setScoreResult(null);
+    setScoringError(null);
     setError(null);
     setScenarioError(null);
     setStep("input");
   }
 
   if (!loaded) return null;
+
+  if (step === "scoring" && selectedScenario) {
+    return (
+      <ScoreScreen
+        scenario={selectedScenario}
+        durationSeconds={callDurationSeconds}
+        result={scoreResult}
+        loading={scoring}
+        error={scoringError}
+        onPracticeAgain={handlePracticeAgain}
+        onDone={handleScoreDone}
+      />
+    );
+  }
 
   if (step === "call" && profile && selectedScenario && prospectIdentity) {
     return (
@@ -142,7 +216,7 @@ export function TrainingSetup() {
         trainingProfile={profile}
         scenario={selectedScenario}
         identity={prospectIdentity}
-        onEnd={handleEndCall}
+        onEnd={handleCallEnded}
       />
     );
   }

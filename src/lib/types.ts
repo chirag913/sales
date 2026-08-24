@@ -127,6 +127,59 @@ export interface CoachTip {
   suggestedResponse: string;
 }
 
+export const CALL_SCORE_CATEGORY_NAMES = [
+  "Opening",
+  "Confidence",
+  "Discovery",
+  "Listening",
+  "Credibility",
+  "Value proposition",
+  "Objection handling",
+  "Question quality",
+  "Call control",
+  "Closing",
+] as const;
+
+export type CallScoreCategoryName = (typeof CALL_SCORE_CATEGORY_NAMES)[number];
+
+export interface CallScoreCategory {
+  name: CallScoreCategoryName;
+  score: number;
+  reason: string;
+  betterApproach: string;
+}
+
+export interface CallMetrics {
+  durationSeconds: number;
+  questionCount: number;
+  userWordCount: number;
+  prospectWordCount: number;
+  userSpeakingPercent: number;
+  prospectSpeakingPercent: number;
+  longestUserMonologueWords: number;
+  objectionCount: number;
+  objectionsHandled: number;
+  missedBuyingSignals: number;
+  pitchCount: number;
+  nextStepAskCount: number;
+}
+
+export interface BetterResponseMoment {
+  whatHappened: string;
+  whatYouSaid: string;
+  betterResponse: string;
+  whyItsBetter: string;
+}
+
+export interface CallScoreResult {
+  overallScore: number;
+  categories: CallScoreCategory[];
+  metrics: CallMetrics;
+  biggestMistake: string;
+  bestMoment: string;
+  betterResponses: BetterResponseMoment[];
+}
+
 export function emptySalesProfile(): SalesProfile {
   return {
     company: { name: "", location: "", website: "", yearsOperating: "", teamSize: "" },

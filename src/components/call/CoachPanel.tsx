@@ -24,28 +24,31 @@ const TYPE_STYLE: Record<CoachTip["type"], { emoji: string; className: string }>
   },
 };
 
-const MODE_OPTIONS: { value: CoachMode; label: string }[] = [
-  { value: "training", label: "Training" },
-  { value: "practice", label: "Practice" },
-  { value: "exam", label: "Exam" },
+const MODE_OPTIONS: { value: CoachMode; label: string; subtitle: string }[] = [
+  { value: "training", label: "Training", subtitle: "Easy — full guidance" },
+  { value: "practice", label: "Practice", subtitle: "Medium — light hints" },
+  { value: "exam", label: "Exam", subtitle: "Hard — no help" },
 ];
 
 export function CoachPanel({ mode, onModeChange, tip, loading }: CoachPanelProps) {
   return (
     <div className="flex w-full flex-col gap-3 sm:w-64 sm:shrink-0">
-      <div className="flex items-center gap-1 rounded-full border border-zinc-200 p-1 dark:border-zinc-800">
+      <div className="flex items-stretch gap-1 rounded-2xl border border-zinc-200 p-1 dark:border-zinc-800">
         {MODE_OPTIONS.map((opt) => (
           <button
             key={opt.value}
             type="button"
             onClick={() => onModeChange(opt.value)}
-            className={`flex-1 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
+            className={`flex flex-1 flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-center transition-colors ${
               mode === opt.value
                 ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                 : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100"
             }`}
           >
-            {opt.label}
+            <span className="text-xs font-medium">{opt.label}</span>
+            <span className={`text-[10px] leading-tight ${mode === opt.value ? "opacity-80" : "opacity-70"}`}>
+              {opt.subtitle}
+            </span>
           </button>
         ))}
       </div>

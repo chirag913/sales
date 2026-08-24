@@ -130,8 +130,12 @@ user's natural-language change request.
 Rules:
 - You will receive the current training profile as JSON, plus a short instruction describing
   what to change.
-- Apply the instruction precisely. Keep every field not affected by the instruction exactly as
-  it was.
+- Copy every field NOT explicitly targeted by the instruction VERBATIM — character-for-character,
+  same array items in the same order — from the current profile. Do not paraphrase, reorder,
+  add to, remove from, or "improve" any array (icpTitles, additionalCriteria, painPoints,
+  likelyObjections) unless the instruction is specifically about that field. Only touch the exact
+  field(s) the instruction is about; if you're unsure whether a field is targeted, leave it
+  untouched.
 - Never invent clients, results, testimonials, offices, guarantees, credentials, pricing, or
   case studies.
 - If the instruction directly changes a field, set that field's key in "assumptions" to false
