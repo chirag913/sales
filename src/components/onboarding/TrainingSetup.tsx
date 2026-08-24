@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CallScreen } from "@/components/call/CallScreen";
 import { HeroInput, HeroInputValue } from "@/components/onboarding/HeroInput";
 import { ProfileReview } from "@/components/onboarding/ProfileReview";
 import { ReadyToCall } from "@/components/onboarding/ReadyToCall";
@@ -14,15 +15,17 @@ import {
   saveTrainingProfile,
 } from "@/lib/storage/localTrainingProfile";
 import { applyTrainingProfileToSalesProfile } from "@/lib/profile/sync";
-import { emptySalesProfile, Scenario, TrainingProfile } from "@/lib/types";
+import { generateProspectIdentity } from "@/lib/prospect/identity";
+import { emptySalesProfile, ProspectIdentity, Scenario, TrainingProfile } from "@/lib/types";
 
-type Step = "input" | "review" | "scenarios" | "ready";
+type Step = "input" | "review" | "scenarios" | "ready" | "call";
 
 export function TrainingSetup() {
   const [step, setStep] = useState<Step>("input");
   const [profile, setProfile] = useState<TrainingProfile | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[] | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
+  const [prospectIdentity, setProspectIdentity] = useState<ProspectIdentity | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generatingScenarios, setGeneratingScenarios] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,11 +104,21 @@ export function TrainingSetup() {
 
   function handleSelectScenario(scenario: Scenario) {
     setSelectedScenario(scenario);
+    if (profile) {
+      setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles));
+    }
     setStep("ready");
   }
 
   function handleBackToScenarios() {
     setSelectedScenario(null);
+    setProspectIdentity(null);
+    setStep("scenarios");
+  }
+
+  function handleEndCall() {
+    setSelectedScenario(null);
+    setProspectIdentity(null);
     setStep("scenarios");
   }
 
@@ -114,6 +127,7 @@ export function TrainingSetup() {
     setProfile(null);
     setScenarios(null);
     setSelectedScenario(null);
+    setProspectIdentity(null);
     setError(null);
     setScenarioError(null);
     setStep("input");
@@ -121,8 +135,28 @@ export function TrainingSetup() {
 
   if (!loaded) return null;
 
-  if (step === "ready" && profile && selectedScenario) {
-    return <ReadyToCall profile={profile} scenario={selectedScenario} onBack={handleBackToScenarios} />;
+  if (step === "call" && profile && selectedScenario && prospectIdentity) {
+    return (
+      <CallScreen
+        salesProfile={loadSalesProfile() ?? emptySalesProfile()}
+        trainingProfile={profile}
+        scenario={selectedScenario}
+        identity={prospectIdentity}
+        onEnd={handleEndCall}
+      />
+    );
+  }
+
+  if (step === "ready" && profile && selectedScenario && prospectIdentity) {
+    return (
+      <ReadyToCall
+        profile={profile}
+        scenario={selectedScenario}
+        identity={prospectIdentity}
+        onBack={handleBackToScenarios}
+        onStartCall={() => setStep("call")}
+      />
+    );
   }
 
   if (step === "scenarios" && profile && scenarios) {

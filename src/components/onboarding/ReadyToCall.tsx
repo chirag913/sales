@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Scenario, TrainingProfile } from "@/lib/types";
+import { ProspectIdentity, Scenario, TrainingProfile } from "@/lib/types";
 
 interface ReadyToCallProps {
   profile: TrainingProfile;
   scenario: Scenario;
+  identity: ProspectIdentity;
   onBack: () => void;
+  onStartCall: () => void;
 }
 
 const MARKET_LABEL: Record<string, string> = {
@@ -18,9 +19,7 @@ const MARKET_LABEL: Record<string, string> = {
   Other: "🌍 Other",
 };
 
-export function ReadyToCall({ profile, scenario, onBack }: ReadyToCallProps) {
-  const [showComingSoon, setShowComingSoon] = useState(false);
-
+export function ReadyToCall({ profile, scenario, identity, onBack, onStartCall }: ReadyToCallProps) {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col items-center justify-center px-6 py-16 text-center">
       <button
@@ -41,14 +40,22 @@ export function ReadyToCall({ profile, scenario, onBack }: ReadyToCallProps) {
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Prospect</dt>
+          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Scenario</dt>
           <dd className="text-zinc-900 dark:text-zinc-50">
-            {scenario.icon} {scenario.name}
+            {scenario.icon} {scenario.name} · {scenario.difficulty}
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Difficulty</dt>
-          <dd className="text-zinc-900 dark:text-zinc-50">{scenario.difficulty}</dd>
+          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Prospect</dt>
+          <dd className="text-zinc-900 dark:text-zinc-50">{identity.fullName}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Title</dt>
+          <dd className="text-zinc-900 dark:text-zinc-50">{identity.title}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Company</dt>
+          <dd className="text-zinc-900 dark:text-zinc-50">{identity.company}</dd>
         </div>
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Objective</dt>
@@ -56,17 +63,15 @@ export function ReadyToCall({ profile, scenario, onBack }: ReadyToCallProps) {
         </div>
       </dl>
 
+      <p className="mt-4 text-xs text-zinc-400 dark:text-zinc-500">
+        Your microphone will be requested when the call starts.
+      </p>
+
       <div className="mt-8">
-        <Button onClick={() => setShowComingSoon(true)} className="px-6 py-3 text-base">
+        <Button onClick={onStartCall} className="px-6 py-3 text-base">
           🎙️ Start Call
         </Button>
       </div>
-
-      {showComingSoon && (
-        <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
-          Voice calling is coming in the next phase — this is where the realtime call will start.
-        </p>
-      )}
     </div>
   );
 }

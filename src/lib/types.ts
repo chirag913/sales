@@ -101,6 +101,32 @@ export interface Scenario {
   objective: string;
 }
 
+export interface ProspectIdentity {
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  title: string;
+  company: string;
+}
+
+export interface TranscriptEntry {
+  id: string;
+  role: "user" | "prospect";
+  text: string;
+  final: boolean;
+  timestamp: number;
+}
+
+export type CoachMode = "training" | "practice" | "exam";
+export type CoachTipType = "objection" | "buying_signal" | "mistake";
+
+export interface CoachTip {
+  type: CoachTipType;
+  label: string;
+  note: string;
+  suggestedResponse: string;
+}
+
 export function emptySalesProfile(): SalesProfile {
   return {
     company: { name: "", location: "", website: "", yearsOperating: "", teamSize: "" },
