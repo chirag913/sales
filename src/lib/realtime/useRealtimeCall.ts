@@ -210,7 +210,18 @@ export function useRealtimeCall() {
           prospectDataArrayRef.current = new Uint8Array(prospectAnalyser.frequencyBinCount);
         };
 
-        const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Bare `audio: true` leaves noise suppression up to browser/OS defaults,
+        // which aren't consistent — steady background noise (fan hum, AC) was
+        // reaching the VAD and transcription model unfiltered, causing false
+        // "speech started" triggers and garbled/hallucinated transcript text.
+        // Explicitly requesting these constraints suppresses it at the source.
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
         streamRef.current = mediaStream;
         mediaStream.getTracks().forEach((track) => pc.addTrack(track, mediaStream));
 

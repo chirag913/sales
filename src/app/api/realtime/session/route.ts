@@ -89,8 +89,10 @@ export async function POST(req: NextRequest) {
                 // room noise) as "speech started" — since interrupt_response is on,
                 // that falsely cuts the prospect off mid-response and can leave the
                 // turn stuck waiting for the (noise-sustained) "silence" that never
-                // comes. Raised so it takes actual talking volume to trigger.
-                threshold: 0.7,
+                // comes. 0.7 alone wasn't enough against real fan noise in testing;
+                // paired with noiseSuppression on the mic track (useRealtimeCall.ts)
+                // which should also make real speech register more cleanly.
+                threshold: 0.8,
               },
             },
             output: {
