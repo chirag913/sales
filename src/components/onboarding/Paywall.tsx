@@ -1,12 +1,12 @@
-import Link from "next/link";
-import { PRIMARY_LINK_CLASSES } from "@/components/ui/linkButtonClasses";
+import { BuyCreditsButton } from "@/components/onboarding/BuyCreditsButton";
 import { CREDIT_PACK_CALLS, CREDIT_PACK_PRICE_INR } from "@/lib/config/pricing";
 
 interface PaywallProps {
   onBack: () => void;
+  onPurchased: () => void;
 }
 
-export function Paywall({ onBack }: PaywallProps) {
+export function Paywall({ onBack, onPurchased }: PaywallProps) {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col items-center justify-center px-6 py-16 text-center">
       <button
@@ -26,9 +26,9 @@ export function Paywall({ onBack }: PaywallProps) {
         <p className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Credit pack</p>
         <p className="mt-3 text-4xl font-semibold text-zinc-900 dark:text-zinc-50">₹{CREDIT_PACK_PRICE_INR}</p>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">~{CREDIT_PACK_CALLS} calls, buy more anytime</p>
-        <Link href="/#pricing" className={`${PRIMARY_LINK_CLASSES} mt-6 w-full px-6 py-3 text-base`}>
-          Buy {CREDIT_PACK_CALLS} calls — ₹{CREDIT_PACK_PRICE_INR}
-        </Link>
+        <div className="mt-6">
+          <BuyCreditsButton onSuccess={onPurchased} />
+        </div>
       </div>
     </div>
   );

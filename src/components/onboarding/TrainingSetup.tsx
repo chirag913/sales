@@ -290,7 +290,15 @@ export function TrainingSetup() {
   if (!loaded) return null;
 
   if (step === "paywall") {
-    return <Paywall onBack={() => setStep(stepBeforePaywall)} />;
+    return (
+      <Paywall
+        onBack={() => setStep(stepBeforePaywall)}
+        onPurchased={() => {
+          void refreshEntitlement();
+          setStep(stepBeforePaywall);
+        }}
+      />
+    );
   }
 
   if (step === "scoring" && selectedScenario) {

@@ -1,9 +1,8 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CREDIT_PACK_CALLS, CREDIT_PACK_PRICE_INR } from "@/lib/config/pricing";
+import { BuyCreditsButton } from "@/components/onboarding/BuyCreditsButton";
 import { EntitlementStatus } from "@/lib/entitlement/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -21,18 +20,24 @@ function usageBadgeText(entitlement: EntitlementStatus): string {
   return "No calls remaining";
 }
 
+async function fetchEntitlement(): Promise<EntitlementStatus | null> {
+  try {
+    const res = await fetch("/api/entitlement/status");
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthenticatedShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [entitlement, setEntitlement] = useState<EntitlementStatus | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/entitlement/status")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: EntitlementStatus | null) => {
-        if (!cancelled && data) setEntitlement(data);
-      })
-      .catch(() => {});
+    void fetchEntitlement().then((data) => {
+      if (!cancelled && data) setEntitlement(data);
+    });
     return () => {
       cancelled = true;
     };
@@ -53,9 +58,10 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
             {entitlement.trialRemaining === 0 && entitlement.credits === 0 && (
               <>
                 {" · "}
-                <Link href="/#pricing" className="underline-offset-4 hover:underline">
-                  Buy {CREDIT_PACK_CALLS} calls — ₹{CREDIT_PACK_PRICE_INR}
-                </Link>
+                <BuyCreditsButton
+                  variant="link"
+                  onSuccess={() => void fetchEntitlement().then((data) => data && setEntitlement(data))}
+                />
               </>
             )}
           </span>
