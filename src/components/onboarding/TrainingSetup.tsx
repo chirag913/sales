@@ -16,7 +16,7 @@ import {
   saveTrainingProfile,
 } from "@/lib/storage/localTrainingProfile";
 import { applyTrainingProfileToSalesProfile } from "@/lib/profile/sync";
-import { generateProspectIdentity } from "@/lib/prospect/identity";
+import { generateProspectIdentity, ProspectGenderPreference } from "@/lib/prospect/identity";
 import {
   CallScoreResult,
   emptySalesProfile,
@@ -34,6 +34,7 @@ export function TrainingSetup() {
   const [scenarios, setScenarios] = useState<Scenario[] | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
   const [prospectIdentity, setProspectIdentity] = useState<ProspectIdentity | null>(null);
+  const [voicePreference, setVoicePreference] = useState<ProspectGenderPreference>("any");
   const [generating, setGenerating] = useState(false);
   const [generatingScenarios, setGeneratingScenarios] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +46,12 @@ export function TrainingSetup() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // One-time client-only hydration from localStorage, gated by `loaded` so the
+    // initial render matches SSR output; a lazy useState initializer would run
+    // during hydration itself and mismatch the server-rendered null.
     const existingProfile = loadTrainingProfile();
     if (existingProfile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfile(existingProfile);
       const existingScenarios = loadScenarios();
       if (existingScenarios && existingScenarios.length > 0) {
@@ -117,7 +122,7 @@ export function TrainingSetup() {
   function handleSelectScenario(scenario: Scenario) {
     setSelectedScenario(scenario);
     if (profile) {
-      setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles));
+      setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, voicePreference));
     }
     setStep("ready");
   }
@@ -166,7 +171,7 @@ export function TrainingSetup() {
 
   function handlePracticeAgain() {
     if (!profile || !selectedScenario) return;
-    setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles));
+    setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, voicePreference));
     setScoreResult(null);
     setScoringError(null);
     setStep("call");
@@ -234,7 +239,15 @@ export function TrainingSetup() {
   }
 
   if (step === "scenarios" && profile && scenarios) {
-    return <ScenarioPicker scenarios={scenarios} onSelect={handleSelectScenario} onBack={() => setStep("review")} />;
+    return (
+      <ScenarioPicker
+        scenarios={scenarios}
+        onSelect={handleSelectScenario}
+        onBack={() => setStep("review")}
+        voicePreference={voicePreference}
+        onVoicePreferenceChange={setVoicePreference}
+      />
+    );
   }
 
   if (step === "review" && profile) {

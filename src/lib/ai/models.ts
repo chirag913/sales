@@ -6,4 +6,13 @@ export const TEXT_MODEL = "gpt-4.1-mini";
 // Verified live against the current /v1/realtime/client_secrets contract.
 export const REALTIME_MODEL = "gpt-realtime-2.1-mini";
 export const REALTIME_TRANSCRIBE_MODEL = "gpt-4o-mini-transcribe";
-export const REALTIME_VOICE = "marin";
+
+export const REALTIME_VOICES = {
+  male: ["cedar", "echo"],
+  female: ["marin", "shimmer"],
+} as const;
+
+export function pickVoiceForGender(gender: "male" | "female"): string {
+  const voices = REALTIME_VOICES[gender];
+  return voices[Math.floor(Math.random() * voices.length)];
+}

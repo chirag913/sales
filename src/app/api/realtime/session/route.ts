@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { REALTIME_MODEL, REALTIME_TRANSCRIBE_MODEL, REALTIME_VOICE } from "@/lib/ai/models";
+import { REALTIME_MODEL, REALTIME_TRANSCRIBE_MODEL, pickVoiceForGender } from "@/lib/ai/models";
 import { buildProspectPrompt } from "@/lib/prompts/buildProspectPrompt";
 import { ProspectIdentity, SalesProfile, Scenario, TrainingProfile } from "@/lib/types";
 
@@ -23,6 +23,10 @@ export async function POST(req: NextRequest) {
   }
 
   const instructions = buildProspectPrompt(salesProfile, trainingProfile, scenario, identity);
+  const voiceGender = identity.gender === "male" || identity.gender === "female"
+    ? identity.gender
+    : Math.random() < 0.5 ? "male" : "female";
+  const voice = pickVoiceForGender(voiceGender);
 
   try {
     const res = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
@@ -52,7 +56,7 @@ export async function POST(req: NextRequest) {
               },
             },
             output: {
-              voice: REALTIME_VOICE,
+              voice,
             },
           },
         },

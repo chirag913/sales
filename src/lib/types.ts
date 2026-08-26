@@ -107,6 +107,7 @@ export interface ProspectIdentity {
   fullName: string;
   title: string;
   company: string;
+  gender: "male" | "female";
 }
 
 export interface TranscriptEntry {

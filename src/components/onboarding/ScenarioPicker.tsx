@@ -1,11 +1,15 @@
 "use client";
 
+import { Chip } from "@/components/ui/Chip";
+import { ProspectGenderPreference } from "@/lib/prospect/identity";
 import { Scenario } from "@/lib/types";
 
 interface ScenarioPickerProps {
   scenarios: Scenario[];
   onSelect: (scenario: Scenario) => void;
   onBack: () => void;
+  voicePreference: ProspectGenderPreference;
+  onVoicePreferenceChange: (preference: ProspectGenderPreference) => void;
 }
 
 const DIFFICULTY_STYLE: Record<Scenario["difficulty"], string> = {
@@ -15,7 +19,19 @@ const DIFFICULTY_STYLE: Record<Scenario["difficulty"], string> = {
   Expert: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
 };
 
-export function ScenarioPicker({ scenarios, onSelect, onBack }: ScenarioPickerProps) {
+const VOICE_PREFERENCE_OPTIONS: { value: ProspectGenderPreference; label: string }[] = [
+  { value: "any", label: "Any voice" },
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+];
+
+export function ScenarioPicker({
+  scenarios,
+  onSelect,
+  onBack,
+  voicePreference,
+  onVoicePreferenceChange,
+}: ScenarioPickerProps) {
   function handleRandomSelect() {
     if (scenarios.length === 0) return;
     const randomScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
@@ -35,6 +51,23 @@ export function ScenarioPicker({ scenarios, onSelect, onBack }: ScenarioPickerPr
       <div className="mb-8 mt-4 text-center">
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Choose your challenge.</h1>
         <p className="mt-2 text-zinc-500 dark:text-zinc-400">Pick a scenario to start practicing.</p>
+      </div>
+
+      <div className="mb-8 flex flex-col items-center gap-2">
+        <span className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+          Prospect voice
+        </span>
+        <div className="flex items-center gap-2">
+          {VOICE_PREFERENCE_OPTIONS.map((option) => (
+            <Chip
+              key={option.value}
+              selected={voicePreference === option.value}
+              onClick={() => onVoicePreferenceChange(option.value)}
+            >
+              {option.label}
+            </Chip>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

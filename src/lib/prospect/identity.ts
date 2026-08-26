@@ -1,34 +1,48 @@
 import { ProspectIdentity, ProspectMarket } from "@/lib/types";
 
-const FIRST_NAMES_BY_MARKET: Record<ProspectMarket, string[]> = {
+const FIRST_NAMES_MALE_BY_MARKET: Record<ProspectMarket, string[]> = {
   US: [
-    "Sarah", "Michael", "Jessica", "David", "Ashley", "James", "Amanda", "Robert",
-    "Emily", "John", "Jennifer", "Christopher", "Lisa", "Matthew", "Michelle", "Daniel",
-    "Kimberly", "Andrew", "Amy", "Joshua", "Angela", "Ryan", "Melissa", "Brandon",
-    "Stephanie", "Justin", "Nicole", "Kevin", "Elizabeth", "Brian",
+    "Michael", "David", "James", "Robert", "John", "Christopher", "Matthew", "Daniel",
+    "Andrew", "Joshua", "Ryan", "Brandon", "Justin", "Kevin", "Brian",
   ],
   UK: [
-    "Oliver", "Olivia", "George", "Amelia", "Harry", "Isla", "Jack", "Ava",
-    "Charlie", "Emily", "Jacob", "Grace", "Thomas", "Sophie", "William", "Poppy",
-    "James", "Freya", "Henry", "Charlotte", "Alfie", "Lily", "Joshua", "Ruby",
-    "Noah", "Isabella", "Ethan", "Evie", "Leo", "Mia",
+    "Oliver", "George", "Harry", "Jack", "Charlie", "Jacob", "Thomas", "William",
+    "James", "Henry", "Alfie", "Joshua", "Noah", "Ethan", "Leo",
   ],
   Canada: [
-    "Liam", "Emma", "Noah", "Charlotte", "Ethan", "Olivia", "Jacob", "Ava",
-    "William", "Sophia", "Benjamin", "Chloe", "Logan", "Zoey", "Lucas", "Mila",
-    "Jack", "Abigail", "Owen", "Emily", "Nathan", "Madison", "Ryan", "Ella",
-    "Carter", "Grace", "Jayden", "Hannah", "Alexander", "Layla",
+    "Liam", "Noah", "Ethan", "Jacob", "William", "Benjamin", "Logan", "Lucas",
+    "Jack", "Owen", "Nathan", "Ryan", "Carter", "Jayden", "Alexander",
   ],
   Australia: [
-    "Jack", "Charlotte", "Oliver", "Olivia", "William", "Amelia", "Noah", "Isla",
-    "Thomas", "Mia", "James", "Grace", "Lucas", "Ava", "Henry", "Willow",
-    "Ethan", "Chloe", "Cooper", "Ivy", "Mason", "Matilda", "Archie", "Ruby",
-    "Leo", "Zoe", "Hunter", "Sophie", "Charlie", "Evie",
+    "Jack", "Oliver", "William", "Noah", "Thomas", "James", "Lucas", "Henry",
+    "Ethan", "Cooper", "Mason", "Archie", "Leo", "Hunter", "Charlie",
   ],
   Other: [
-    "Alex", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Sam", "Jamie",
-    "Drew", "Avery", "Quinn", "Reese", "Rowan", "Skyler", "Dana", "Kai",
-    "Emerson", "Blake", "Peyton", "Elliot",
+    "Alex", "Taylor", "Casey", "Sam", "Drew", "Quinn", "Rowan", "Dana",
+    "Emerson", "Peyton",
+  ],
+};
+
+const FIRST_NAMES_FEMALE_BY_MARKET: Record<ProspectMarket, string[]> = {
+  US: [
+    "Sarah", "Jessica", "Ashley", "Amanda", "Emily", "Jennifer", "Lisa", "Michelle",
+    "Kimberly", "Amy", "Angela", "Melissa", "Stephanie", "Nicole", "Elizabeth",
+  ],
+  UK: [
+    "Olivia", "Amelia", "Isla", "Ava", "Emily", "Grace", "Sophie", "Poppy",
+    "Freya", "Charlotte", "Lily", "Ruby", "Isabella", "Evie", "Mia",
+  ],
+  Canada: [
+    "Emma", "Charlotte", "Olivia", "Ava", "Sophia", "Chloe", "Zoey", "Mila",
+    "Abigail", "Emily", "Madison", "Ella", "Grace", "Hannah", "Layla",
+  ],
+  Australia: [
+    "Charlotte", "Olivia", "Amelia", "Isla", "Mia", "Grace", "Ava", "Willow",
+    "Chloe", "Ivy", "Matilda", "Ruby", "Zoe", "Sophie", "Evie",
+  ],
+  Other: [
+    "Jordan", "Morgan", "Riley", "Jamie", "Avery", "Reese", "Skyler", "Kai",
+    "Blake", "Elliot",
   ],
 };
 
@@ -66,9 +80,23 @@ function extractIndustryWord(title: string): string | null {
   return stripped.length > 0 ? stripped : null;
 }
 
-export function generateProspectIdentity(market: ProspectMarket, icpTitles: string[]): ProspectIdentity {
+export type ProspectGenderPreference = "male" | "female" | "any";
+
+export function generateProspectIdentity(
+  market: ProspectMarket,
+  icpTitles: string[],
+  genderPreference: ProspectGenderPreference = "any"
+): ProspectIdentity {
   const title = icpTitles.length > 0 ? pickRandom(icpTitles) : "Manager";
-  const firstNames = FIRST_NAMES_BY_MARKET[market] ?? FIRST_NAMES_BY_MARKET.Other;
+  const gender: "male" | "female" =
+    genderPreference === "male" || genderPreference === "female"
+      ? genderPreference
+      : Math.random() < 0.5
+        ? "male"
+        : "female";
+  const firstNames =
+    (gender === "male" ? FIRST_NAMES_MALE_BY_MARKET[market] : FIRST_NAMES_FEMALE_BY_MARKET[market]) ??
+    (gender === "male" ? FIRST_NAMES_MALE_BY_MARKET.Other : FIRST_NAMES_FEMALE_BY_MARKET.Other);
   const firstName = pickRandom(firstNames);
   const lastName = pickRandom(LAST_NAMES);
   const industryWord = extractIndustryWord(title) ?? pickRandom(GENERIC_INDUSTRY_WORDS);
@@ -80,5 +108,6 @@ export function generateProspectIdentity(market: ProspectMarket, icpTitles: stri
     fullName: `${firstName} ${lastName}`,
     title,
     company,
+    gender,
   };
 }
