@@ -1,5 +1,6 @@
 import { getOpenAIClient } from "@/lib/ai/client";
 import { TEXT_MODEL } from "@/lib/ai/models";
+import { OBJECTION_TYPES } from "@/lib/ai/objectionTaxonomy";
 import { buildCompanyContext } from "@/lib/prompts/companyContext";
 import { CoachTip, SalesProfile, TrainingProfile } from "@/lib/types";
 
@@ -7,8 +8,7 @@ const SYSTEM_PROMPT = `You are a silent sales coach watching a live cold-call tr
 to the prospect — you only advise the salesperson (the caller), based on the most recent lines of
 the call.
 
-Objection types to recognize: TIME, PRICE, TRUST, LOCATION, US OFFICE, CREDIBILITY, COMPETITOR,
-NO NEED, NO BUDGET, ALREADY HAVE PROVIDER, SEND EMAIL, AUTHORITY, TIMING.
+Objection types to recognize: ${OBJECTION_TYPES.join(", ")}.
 
 Buying signals to recognize: asking about pricing, asking about results, asking about
 implementation, asking about availability, asking about next steps, describing a pain point,

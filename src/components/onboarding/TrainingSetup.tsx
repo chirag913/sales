@@ -1,26 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CallScreen } from "@/components/call/CallScreen";
 import { ScoreScreen } from "@/components/call/ScoreScreen";
 import { HeroInput, HeroInputValue } from "@/components/onboarding/HeroInput";
 import { ProfileReview } from "@/components/onboarding/ProfileReview";
 import { ReadyToCall } from "@/components/onboarding/ReadyToCall";
 import { ScenarioPicker } from "@/components/onboarding/ScenarioPicker";
-import { loadSalesProfile, saveSalesProfile } from "@/lib/storage/localProfile";
-import {
-  clearTrainingProfile,
-  loadScenarios,
-  loadTrainingProfile,
-  saveScenarios,
-  saveTrainingProfile,
-} from "@/lib/storage/localTrainingProfile";
+import { migrateLocalDataIfNeeded } from "@/lib/profile/migrateLocalData";
 import { applyTrainingProfileToSalesProfile } from "@/lib/profile/sync";
 import { generateProspectIdentity, ProspectGenderPreference } from "@/lib/prospect/identity";
+import { createClient } from "@/lib/supabase/client";
+import {
+  clearRemoteTrainingProfile,
+  loadRemoteProfileRow,
+  saveRemoteSalesProfile,
+  saveRemoteScenarios,
+  saveRemoteTrainingProfile,
+} from "@/lib/storage/supabaseProfile";
 import {
   CallScoreResult,
   emptySalesProfile,
   ProspectIdentity,
+  SalesProfile,
   Scenario,
   TranscriptEntry,
   TrainingProfile,
@@ -29,8 +31,11 @@ import {
 type Step = "input" | "review" | "scenarios" | "ready" | "call" | "scoring";
 
 export function TrainingSetup() {
+  const supabase = useMemo(() => createClient(), []);
+  const [userId, setUserId] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("input");
   const [profile, setProfile] = useState<TrainingProfile | null>(null);
+  const [salesProfile, setSalesProfile] = useState<SalesProfile>(emptySalesProfile());
   const [scenarios, setScenarios] = useState<Scenario[] | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
   const [prospectIdentity, setProspectIdentity] = useState<ProspectIdentity | null>(null);
@@ -41,34 +46,54 @@ export function TrainingSetup() {
   const [scenarioError, setScenarioError] = useState<string | null>(null);
   const [callDurationSeconds, setCallDurationSeconds] = useState(0);
   const [scoreResult, setScoreResult] = useState<CallScoreResult | null>(null);
+  const [callTranscript, setCallTranscript] = useState<TranscriptEntry[] | null>(null);
   const [scoring, setScoring] = useState(false);
   const [scoringError, setScoringError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    // One-time client-only hydration from localStorage, gated by `loaded` so the
-    // initial render matches SSR output; a lazy useState initializer would run
-    // during hydration itself and mismatch the server-rendered null.
-    const existingProfile = loadTrainingProfile();
-    if (existingProfile) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setProfile(existingProfile);
-      const existingScenarios = loadScenarios();
-      if (existingScenarios && existingScenarios.length > 0) {
-        setScenarios(existingScenarios);
-        setStep("scenarios");
-      } else {
-        setStep("review");
-      }
-    }
-    setLoaded(true);
-  }, []);
+    let cancelled = false;
 
-  function persistProfile(next: TrainingProfile) {
+    async function hydrate() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) {
+        setLoaded(true);
+        return;
+      }
+
+      await migrateLocalDataIfNeeded(supabase, user.id);
+      const remote = await loadRemoteProfileRow(supabase, user.id);
+      if (cancelled) return;
+
+      setUserId(user.id);
+      if (remote?.salesProfile) setSalesProfile(remote.salesProfile);
+      if (remote?.trainingProfile) {
+        setProfile(remote.trainingProfile);
+        if (remote.scenarios && remote.scenarios.length > 0) {
+          setScenarios(remote.scenarios);
+          setStep("scenarios");
+        } else {
+          setStep("review");
+        }
+      }
+      setLoaded(true);
+    }
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  async function persistProfile(next: TrainingProfile) {
     setProfile(next);
-    saveTrainingProfile(next);
-    const existingSales = loadSalesProfile() ?? emptySalesProfile();
-    saveSalesProfile(applyTrainingProfileToSalesProfile(next, existingSales));
+    if (!userId) return;
+    void saveRemoteTrainingProfile(supabase, userId, next);
+    const nextSales = applyTrainingProfileToSalesProfile(next, salesProfile);
+    setSalesProfile(nextSales);
+    void saveRemoteSalesProfile(supabase, userId, nextSales);
   }
 
   async function handleGenerate(input: HeroInputValue) {
@@ -85,7 +110,7 @@ export function TrainingSetup() {
         throw new Error(body?.error ?? "Failed to generate training profile.");
       }
       const generated: TrainingProfile = await res.json();
-      persistProfile(generated);
+      void persistProfile(generated);
       setStep("review");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -110,7 +135,7 @@ export function TrainingSetup() {
       }
       const generated: Scenario[] = await res.json();
       setScenarios(generated);
-      saveScenarios(generated);
+      if (userId) void saveRemoteScenarios(supabase, userId, generated);
       setStep("scenarios");
     } catch (err) {
       setScenarioError(err instanceof Error ? err.message : "Something went wrong.");
@@ -143,7 +168,7 @@ export function TrainingSetup() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transcript,
-          salesProfile: loadSalesProfile() ?? emptySalesProfile(),
+          salesProfile,
           trainingProfile,
           scenario,
           durationSeconds,
@@ -155,6 +180,22 @@ export function TrainingSetup() {
       }
       const result: CallScoreResult = await res.json();
       setScoreResult(result);
+
+      if (prospectIdentity) {
+        void fetch("/api/calls/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scenario,
+            identity: prospectIdentity,
+            durationSeconds,
+            result,
+            transcript,
+          }),
+        }).catch(() => {
+          // Call storage is a non-critical enhancement — fail silently, same as coaching.
+        });
+      }
     } catch (err) {
       setScoringError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -165,6 +206,7 @@ export function TrainingSetup() {
   function handleCallEnded(transcript: TranscriptEntry[], durationSeconds: number) {
     if (!profile || !selectedScenario) return;
     setCallDurationSeconds(durationSeconds);
+    setCallTranscript(transcript);
     setStep("scoring");
     void runScoring(transcript, durationSeconds, selectedScenario, profile);
   }
@@ -174,6 +216,7 @@ export function TrainingSetup() {
     setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
     setScoreResult(null);
     setScoringError(null);
+    setCallTranscript(null);
     setStep("call");
   }
 
@@ -182,11 +225,12 @@ export function TrainingSetup() {
     setProspectIdentity(null);
     setScoreResult(null);
     setScoringError(null);
+    setCallTranscript(null);
     setStep("scenarios");
   }
 
   function handleStartOver() {
-    clearTrainingProfile();
+    if (userId) void clearRemoteTrainingProfile(supabase, userId);
     setProfile(null);
     setScenarios(null);
     setSelectedScenario(null);
@@ -208,6 +252,7 @@ export function TrainingSetup() {
         result={scoreResult}
         loading={scoring}
         error={scoringError}
+        transcript={callTranscript}
         onPracticeAgain={handlePracticeAgain}
         onDone={handleScoreDone}
       />
@@ -217,7 +262,7 @@ export function TrainingSetup() {
   if (step === "call" && profile && selectedScenario && prospectIdentity) {
     return (
       <CallScreen
-        salesProfile={loadSalesProfile() ?? emptySalesProfile()}
+        salesProfile={salesProfile}
         trainingProfile={profile}
         scenario={selectedScenario}
         identity={prospectIdentity}
@@ -254,7 +299,7 @@ export function TrainingSetup() {
     return (
       <ProfileReview
         profile={profile}
-        onChange={persistProfile}
+        onChange={(next) => void persistProfile(next)}
         onStartOver={handleStartOver}
         onConfirm={handleConfirmProfile}
         confirming={generatingScenarios}

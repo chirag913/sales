@@ -1,28 +1,47 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { FormField } from "@/components/ui/FormField";
 import { FormSection } from "@/components/ui/FormSection";
 import { Button } from "@/components/ui/Button";
-import { loadSalesProfile, saveSalesProfile } from "@/lib/storage/localProfile";
+import { createClient } from "@/lib/supabase/client";
+import { loadRemoteProfileRow, saveRemoteSalesProfile } from "@/lib/storage/supabaseProfile";
 import { emptySalesProfile, SalesProfile, SALES_OBJECTIVE_OPTIONS } from "@/lib/types";
 
 type ObjectSectionKey = "company" | "offer" | "targetCustomer" | "proof" | "importantInfo";
 
 export function ProfileForm() {
+  const supabase = useMemo(() => createClient(), []);
+  const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<SalesProfile>(emptySalesProfile());
   const [loaded, setLoaded] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
-    // One-time client-only hydration from localStorage, gated by `loaded` so the
-    // initial render matches SSR output; a lazy useState initializer would run
-    // during hydration itself and mismatch the server-rendered null.
-    const existing = loadSalesProfile();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (existing) setProfile(existing);
-    setLoaded(true);
-  }, []);
+    let cancelled = false;
+
+    async function hydrate() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) {
+        setLoaded(true);
+        return;
+      }
+
+      const remote = await loadRemoteProfileRow(supabase, user.id);
+      if (cancelled) return;
+
+      setUserId(user.id);
+      if (remote?.salesProfile) setProfile(remote.salesProfile);
+      setLoaded(true);
+    }
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   function update<K extends ObjectSectionKey>(section: K, field: keyof SalesProfile[K], value: string) {
     setSavedAt(null);
@@ -34,7 +53,7 @@ export function ProfileForm() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    saveSalesProfile(profile);
+    if (userId) void saveRemoteSalesProfile(supabase, userId, profile);
     setSavedAt(Date.now());
   }
 

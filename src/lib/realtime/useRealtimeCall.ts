@@ -55,7 +55,49 @@ export function useRealtimeCall() {
   const streamRef = useRef<MediaStream | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
 
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const userAnalyserRef = useRef<AnalyserNode | null>(null);
+  const userDataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const prospectAnalyserRef = useRef<AnalyserNode | null>(null);
+  const prospectDataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const userAmplitudeRef = useRef(0);
+  const prospectAmplitudeRef = useRef(0);
+  const amplitudeFrameRef = useRef<number | null>(null);
+
+  const startAmplitudeLoop = useCallback(() => {
+    const tick = () => {
+      const userAnalyser = userAnalyserRef.current;
+      const userData = userDataArrayRef.current;
+      if (userAnalyser && userData) {
+        userAnalyser.getByteFrequencyData(userData);
+        let sum = 0;
+        for (let i = 0; i < userData.length; i++) sum += userData[i];
+        userAmplitudeRef.current = sum / userData.length / 255;
+      } else {
+        userAmplitudeRef.current = 0;
+      }
+
+      const prospectAnalyser = prospectAnalyserRef.current;
+      const prospectData = prospectDataArrayRef.current;
+      if (prospectAnalyser && prospectData) {
+        prospectAnalyser.getByteFrequencyData(prospectData);
+        let sum = 0;
+        for (let i = 0; i < prospectData.length; i++) sum += prospectData[i];
+        prospectAmplitudeRef.current = sum / prospectData.length / 255;
+      } else {
+        prospectAmplitudeRef.current = 0;
+      }
+
+      amplitudeFrameRef.current = requestAnimationFrame(tick);
+    };
+    amplitudeFrameRef.current = requestAnimationFrame(tick);
+  }, []);
+
   const cleanup = useCallback(() => {
+    if (amplitudeFrameRef.current !== null) {
+      cancelAnimationFrame(amplitudeFrameRef.current);
+      amplitudeFrameRef.current = null;
+    }
     dcRef.current?.close();
     dcRef.current = null;
     pcRef.current?.getSenders().forEach((sender) => sender.track?.stop());
@@ -67,6 +109,14 @@ export function useRealtimeCall() {
       audioElRef.current.srcObject = null;
       audioElRef.current = null;
     }
+    audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
+    userAnalyserRef.current = null;
+    userDataArrayRef.current = null;
+    prospectAnalyserRef.current = null;
+    prospectDataArrayRef.current = null;
+    userAmplitudeRef.current = 0;
+    prospectAmplitudeRef.current = 0;
   }, []);
 
   const start = useCallback(
@@ -90,16 +140,34 @@ export function useRealtimeCall() {
         const pc = new RTCPeerConnection();
         pcRef.current = pc;
 
+        const audioContext = new AudioContext();
+        audioContextRef.current = audioContext;
+        audioContext.resume().catch(() => {});
+        startAmplitudeLoop();
+
         const audioEl = document.createElement("audio");
         audioEl.autoplay = true;
         audioElRef.current = audioEl;
         pc.ontrack = (e) => {
           audioEl.srcObject = e.streams[0];
+          const prospectSource = audioContext.createMediaStreamSource(e.streams[0]);
+          const prospectAnalyser = audioContext.createAnalyser();
+          prospectAnalyser.fftSize = 256;
+          prospectSource.connect(prospectAnalyser);
+          prospectAnalyserRef.current = prospectAnalyser;
+          prospectDataArrayRef.current = new Uint8Array(prospectAnalyser.frequencyBinCount);
         };
 
         const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = mediaStream;
         mediaStream.getTracks().forEach((track) => pc.addTrack(track, mediaStream));
+
+        const userSource = audioContext.createMediaStreamSource(mediaStream);
+        const userAnalyser = audioContext.createAnalyser();
+        userAnalyser.fftSize = 256;
+        userSource.connect(userAnalyser);
+        userAnalyserRef.current = userAnalyser;
+        userDataArrayRef.current = new Uint8Array(userAnalyser.frequencyBinCount);
 
         const dc = pc.createDataChannel("oai-events");
         dcRef.current = dc;
@@ -176,7 +244,7 @@ export function useRealtimeCall() {
         cleanup();
       }
     },
-    [cleanup]
+    [cleanup, startAmplitudeLoop]
   );
 
   const stop = useCallback(() => {
@@ -185,5 +253,5 @@ export function useRealtimeCall() {
     setSpeaking(false);
   }, [cleanup]);
 
-  return { status, transcript, error, speaking, start, stop };
+  return { status, transcript, error, speaking, start, stop, userAmplitudeRef, prospectAmplitudeRef };
 }
