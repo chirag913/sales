@@ -4,7 +4,7 @@ import { ProfileForm } from "@/components/profile/ProfileForm";
 export default function ProfilePage() {
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-12">
-      <Link href="/" className="text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400">
+      <Link href="/practice" className="text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400">
         ← Back to training setup
       </Link>
       <h1 className="mt-4 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Improve My Training</h1>
