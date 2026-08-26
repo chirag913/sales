@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BuyCreditsButton } from "@/components/onboarding/BuyCreditsButton";
 import { EntitlementStatus } from "@/lib/entitlement/types";
@@ -73,6 +74,12 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
             onSuccess={() => void fetchEntitlement().then((data) => data && setEntitlement(data))}
           />
         )}
+        <Link
+          href="/history"
+          className="text-xs text-zinc-400 underline-offset-4 hover:underline dark:text-zinc-500"
+        >
+          History
+        </Link>
         <button
           type="button"
           onClick={handleSignOut}
