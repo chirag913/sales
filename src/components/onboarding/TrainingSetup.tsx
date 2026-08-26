@@ -122,7 +122,7 @@ export function TrainingSetup() {
   function handleSelectScenario(scenario: Scenario) {
     setSelectedScenario(scenario);
     if (profile) {
-      setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, voicePreference));
+      setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
     }
     setStep("ready");
   }
@@ -171,7 +171,7 @@ export function TrainingSetup() {
 
   function handlePracticeAgain() {
     if (!profile || !selectedScenario) return;
-    setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, voicePreference));
+    setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
     setScoreResult(null);
     setScoringError(null);
     setStep("call");
