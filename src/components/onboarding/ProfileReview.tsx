@@ -38,6 +38,39 @@ type EditingKey =
 const inputClasses =
   "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-100 dark:focus:ring-zinc-100";
 
+function EditActions({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
+  return (
+    <div className="mt-3 flex justify-end gap-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="rounded-md px-3 py-1.5 text-sm text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={onSave}
+        className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+      >
+        Save
+      </button>
+    </div>
+  );
+}
+
+function EditButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-3 text-xs font-medium text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
+    >
+      Edit
+    </button>
+  );
+}
+
 export function ProfileReview({
   profile,
   onChange,
@@ -100,39 +133,6 @@ export function ProfileReview({
     setDraft({});
   }
 
-  function EditActions({ onSave }: { onSave: () => void }) {
-    return (
-      <div className="mt-3 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={cancelEdit}
-          className="rounded-md px-3 py-1.5 text-sm text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={onSave}
-          className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-        >
-          Save
-        </button>
-      </div>
-    );
-  }
-
-  function EditButton({ onClick }: { onClick: () => void }) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="mt-3 text-xs font-medium text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
-      >
-        Edit
-      </button>
-    );
-  }
-
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-16">
       <div className="mb-8 text-center">
@@ -157,7 +157,10 @@ export function ProfileReview({
                   </option>
                 ))}
               </select>
-              <EditActions onSave={() => saveEdit({ market: draft.market ?? profile.market }, ["market"])} />
+              <EditActions
+                onSave={() => saveEdit({ market: draft.market ?? profile.market }, ["market"])}
+                onCancel={cancelEdit}
+              />
             </>
           ) : (
             <>
@@ -176,7 +179,10 @@ export function ProfileReview({
                 value={draft.service ?? profile.service}
                 onChange={(e) => setDraft((d) => ({ ...d, service: e.target.value }))}
               />
-              <EditActions onSave={() => saveEdit({ service: draft.service ?? profile.service }, ["service"])} />
+              <EditActions
+                onSave={() => saveEdit({ service: draft.service ?? profile.service }, ["service"])}
+                onCancel={cancelEdit}
+              />
             </>
           ) : (
             <>
@@ -194,7 +200,10 @@ export function ProfileReview({
                 onChange={(values) => setDraft((d) => ({ ...d, icpTitles: values }))}
                 placeholder="Add a job title"
               />
-              <EditActions onSave={() => saveEdit({ icpTitles: draft.icpTitles ?? profile.icpTitles }, ["icpTitles"])} />
+              <EditActions
+                onSave={() => saveEdit({ icpTitles: draft.icpTitles ?? profile.icpTitles }, ["icpTitles"])}
+                onCancel={cancelEdit}
+              />
             </>
           ) : (
             <>
@@ -235,6 +244,7 @@ export function ProfileReview({
                     ["companySizeRange", "additionalCriteria"]
                   )
                 }
+                onCancel={cancelEdit}
               />
             </>
           ) : (
@@ -267,7 +277,10 @@ export function ProfileReview({
                 onChange={(values) => setDraft((d) => ({ ...d, painPoints: values }))}
                 placeholder="Add a pain point"
               />
-              <EditActions onSave={() => saveEdit({ painPoints: draft.painPoints ?? profile.painPoints }, ["painPoints"])} />
+              <EditActions
+                onSave={() => saveEdit({ painPoints: draft.painPoints ?? profile.painPoints }, ["painPoints"])}
+                onCancel={cancelEdit}
+              />
             </>
           ) : (
             <>
@@ -297,6 +310,7 @@ export function ProfileReview({
                 onSave={() =>
                   saveEdit({ likelyObjections: draft.likelyObjections ?? profile.likelyObjections }, ["likelyObjections"])
                 }
+                onCancel={cancelEdit}
               />
             </>
           ) : (
@@ -344,6 +358,7 @@ export function ProfileReview({
                     ["salesObjective"]
                   )
                 }
+                onCancel={cancelEdit}
               />
             </>
           ) : (
@@ -376,6 +391,7 @@ export function ProfileReview({
               />
               <EditActions
                 onSave={() => saveEdit({ typicalProspect: draft.typicalProspect ?? profile.typicalProspect }, ["typicalProspect"])}
+                onCancel={cancelEdit}
               />
             </>
           ) : (

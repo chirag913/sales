@@ -26,7 +26,7 @@ export function CallScreen({ salesProfile, trainingProfile, scenario, identity, 
   const { status, transcript, error, speaking, start, stop } = useRealtimeCall();
   const startedRef = useRef(false);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
-  const callStartRef = useRef(Date.now());
+  const callStartRef = useRef<number | null>(null);
 
   const [coachMode, setCoachMode] = useState<CoachMode>("training");
   const [coachTip, setCoachTip] = useState<CoachTip | null>(null);
@@ -37,6 +37,7 @@ export function CallScreen({ salesProfile, trainingProfile, scenario, identity, 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
+    callStartRef.current = Date.now();
     start({ salesProfile, trainingProfile, scenario, identity });
     return () => {
       stop();
@@ -82,7 +83,7 @@ export function CallScreen({ salesProfile, trainingProfile, scenario, identity, 
   }, [transcript, coachMode, salesProfile, trainingProfile]);
 
   function handleEndCall() {
-    const durationSeconds = Math.round((Date.now() - callStartRef.current) / 1000);
+    const durationSeconds = Math.round((Date.now() - (callStartRef.current ?? Date.now())) / 1000);
     stop();
     onEnd(transcript, durationSeconds);
   }

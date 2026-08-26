@@ -114,7 +114,6 @@ export function useRealtimeCall() {
             console.warn("Failed to parse realtime event", e.data);
             return;
           }
-          // eslint-disable-next-line no-console
           console.debug("[realtime event]", event.type, event);
 
           switch (event.type) {

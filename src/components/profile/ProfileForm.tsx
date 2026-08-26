@@ -15,7 +15,11 @@ export function ProfileForm() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
+    // One-time client-only hydration from localStorage, gated by `loaded` so the
+    // initial render matches SSR output; a lazy useState initializer would run
+    // during hydration itself and mismatch the server-rendered null.
     const existing = loadSalesProfile();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (existing) setProfile(existing);
     setLoaded(true);
   }, []);
