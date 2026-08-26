@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { refineTrainingProfile } from "@/lib/ai/profile";
+import { getAuthenticatedUserId } from "@/lib/supabase/auth";
 import { TrainingProfile } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
   const body = await req.json().catch(() => null);
   const profile = body?.profile as TrainingProfile | undefined;
   const instruction = typeof body?.instruction === "string" ? body.instruction.trim() : "";

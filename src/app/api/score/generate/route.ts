@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateCallScore } from "@/lib/ai/score";
 import { computeTranscriptMetrics } from "@/lib/scoring/metrics";
+import { getAuthenticatedUserId } from "@/lib/supabase/auth";
 import { CallScoreResult, SalesProfile, Scenario, TranscriptEntry, TrainingProfile } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
   const body = await req.json().catch(() => null);
   const transcript = body?.transcript as TranscriptEntry[] | undefined;
   const salesProfile = body?.salesProfile as SalesProfile | undefined;

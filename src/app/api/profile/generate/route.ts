@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateTrainingProfile } from "@/lib/ai/profile";
+import { getAuthenticatedUserId } from "@/lib/supabase/auth";
 
 export async function POST(req: NextRequest) {
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
   const body = await req.json().catch(() => null);
   const description = typeof body?.description === "string" ? body.description.trim() : "";
   const context = typeof body?.context === "string" ? body.context.trim() : "";
