@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PRIMARY_LINK_CLASSES } from "@/components/landing/linkButtonClasses";
+import { PRIMARY_LINK_CLASSES } from "@/components/ui/linkButtonClasses";
 
 export function LandingNav() {
   return (

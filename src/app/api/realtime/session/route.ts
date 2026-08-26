@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { REALTIME_MODEL, REALTIME_TRANSCRIBE_MODEL, pickVoiceForGender } from "@/lib/ai/models";
+import { MAX_CALL_DURATION_SECONDS } from "@/lib/config/pricing";
 import { buildProspectPrompt } from "@/lib/prompts/buildProspectPrompt";
+import { createClient } from "@/lib/supabase/server";
 import { ProspectIdentity, SalesProfile, Scenario, TrainingProfile } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getClaims();
+  if (!authData?.claims) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
   const body = await req.json().catch(() => null);
   const salesProfile = body?.salesProfile as SalesProfile | undefined;
   const trainingProfile = body?.trainingProfile as TrainingProfile | undefined;
@@ -22,10 +30,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "OPENAI_API_KEY is not set." }, { status: 500 });
   }
 
+  // Reserve one trial call or paid credit BEFORE creating an expensive OpenAI
+  // realtime session. This is an atomic, server-side DB operation — see
+  // reserve_call_entitlement() in supabase/migrations/0003_entitlements.sql.
+  const { data: reservation, error: reserveError } = await supabase
+    .rpc("reserve_call_entitlement", {
+      p_scenario: scenario,
+      p_identity: identity,
+      p_max_duration_seconds: MAX_CALL_DURATION_SECONDS,
+    })
+    .single();
+
+  if (reserveError || !reservation) {
+    if (reserveError?.message === "entitlement_required") {
+      return NextResponse.json({ error: "entitlement_required" }, { status: 403 });
+    }
+    console.error("realtime/session: entitlement reservation failed", reserveError);
+    return NextResponse.json({ error: "Failed to start call." }, { status: 500 });
+  }
+
+  const { call_id: callId } = reservation as { call_id: string; entitlement_type: string };
+
   const instructions = buildProspectPrompt(salesProfile, trainingProfile, scenario, identity);
-  const voiceGender = identity.gender === "male" || identity.gender === "female"
-    ? identity.gender
-    : Math.random() < 0.5 ? "male" : "female";
+  const voiceGender =
+    identity.gender === "male" || identity.gender === "female"
+      ? identity.gender
+      : Math.random() < 0.5
+        ? "male"
+        : "female";
   const voice = pickVoiceForGender(voiceGender);
 
   try {
@@ -66,13 +98,19 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       const errBody = await res.text();
       console.error("realtime/session: OpenAI request failed", res.status, errBody);
+      await supabase.rpc("release_call_entitlement", { p_call_id: callId });
       return NextResponse.json({ error: "Failed to start realtime session." }, { status: 502 });
     }
 
     const data = (await res.json()) as { value: string; expires_at: number };
-    return NextResponse.json({ value: data.value, expiresAt: data.expires_at });
+
+    await supabase.rpc("mark_call_started", { p_call_id: callId });
+    const deadlineAt = new Date(Date.now() + MAX_CALL_DURATION_SECONDS * 1000).toISOString();
+
+    return NextResponse.json({ value: data.value, expiresAt: data.expires_at, callId, deadlineAt });
   } catch (err) {
     console.error("realtime/session failed", err);
+    await supabase.rpc("release_call_entitlement", { p_call_id: callId });
     return NextResponse.json({ error: "Failed to start realtime session." }, { status: 500 });
   }
 }

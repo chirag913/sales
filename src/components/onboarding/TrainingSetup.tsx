@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CallScreen } from "@/components/call/CallScreen";
+import { CallScreen, CallEndReason } from "@/components/call/CallScreen";
 import { ScoreScreen } from "@/components/call/ScoreScreen";
 import { HeroInput, HeroInputValue } from "@/components/onboarding/HeroInput";
+import { Paywall } from "@/components/onboarding/Paywall";
 import { ProfileReview } from "@/components/onboarding/ProfileReview";
 import { ReadyToCall } from "@/components/onboarding/ReadyToCall";
 import { ScenarioPicker } from "@/components/onboarding/ScenarioPicker";
+import { EntitlementStatus } from "@/lib/entitlement/types";
 import { migrateLocalDataIfNeeded } from "@/lib/profile/migrateLocalData";
 import { applyTrainingProfileToSalesProfile } from "@/lib/profile/sync";
 import { generateProspectIdentity, ProspectGenderPreference } from "@/lib/prospect/identity";
@@ -28,18 +30,20 @@ import {
   TrainingProfile,
 } from "@/lib/types";
 
-type Step = "input" | "review" | "scenarios" | "ready" | "call" | "scoring";
+type Step = "input" | "review" | "scenarios" | "ready" | "call" | "scoring" | "paywall";
 
 export function TrainingSetup() {
   const supabase = useMemo(() => createClient(), []);
   const [userId, setUserId] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("input");
+  const [stepBeforePaywall, setStepBeforePaywall] = useState<Step>("scenarios");
   const [profile, setProfile] = useState<TrainingProfile | null>(null);
   const [salesProfile, setSalesProfile] = useState<SalesProfile>(emptySalesProfile());
   const [scenarios, setScenarios] = useState<Scenario[] | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
   const [prospectIdentity, setProspectIdentity] = useState<ProspectIdentity | null>(null);
   const [voicePreference, setVoicePreference] = useState<ProspectGenderPreference>("any");
+  const [entitlement, setEntitlement] = useState<EntitlementStatus | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generatingScenarios, setGeneratingScenarios] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +54,18 @@ export function TrainingSetup() {
   const [scoring, setScoring] = useState(false);
   const [scoringError, setScoringError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+
+  async function refreshEntitlement(): Promise<EntitlementStatus | null> {
+    try {
+      const res = await fetch("/api/entitlement/status");
+      if (!res.ok) return null;
+      const status: EntitlementStatus = await res.json();
+      setEntitlement(status);
+      return status;
+    } catch {
+      return null;
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +94,7 @@ export function TrainingSetup() {
           setStep("review");
         }
       }
+      void refreshEntitlement();
       setLoaded(true);
     }
 
@@ -144,7 +161,13 @@ export function TrainingSetup() {
     }
   }
 
-  function handleSelectScenario(scenario: Scenario) {
+  async function handleSelectScenario(scenario: Scenario) {
+    const current = (await refreshEntitlement()) ?? entitlement;
+    if (current && !current.canStartCall) {
+      setStepBeforePaywall("scenarios");
+      setStep("paywall");
+      return;
+    }
     setSelectedScenario(scenario);
     if (profile) {
       setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
@@ -158,7 +181,14 @@ export function TrainingSetup() {
     setStep("scenarios");
   }
 
-  async function runScoring(transcript: TranscriptEntry[], durationSeconds: number, scenario: Scenario, trainingProfile: TrainingProfile) {
+  async function runScoring(
+    transcript: TranscriptEntry[],
+    durationSeconds: number,
+    scenario: Scenario,
+    trainingProfile: TrainingProfile,
+    callId: string,
+    reason: CallEndReason
+  ) {
     setScoring(true);
     setScoringError(null);
     setScoreResult(null);
@@ -186,6 +216,8 @@ export function TrainingSetup() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            callId,
+            status: reason,
             scenario,
             identity: prospectIdentity,
             durationSeconds,
@@ -200,19 +232,32 @@ export function TrainingSetup() {
       setScoringError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setScoring(false);
+      void refreshEntitlement();
     }
   }
 
-  function handleCallEnded(transcript: TranscriptEntry[], durationSeconds: number) {
+  function handleCallEnded(transcript: TranscriptEntry[], durationSeconds: number, callId: string, reason: CallEndReason) {
     if (!profile || !selectedScenario) return;
     setCallDurationSeconds(durationSeconds);
     setCallTranscript(transcript);
     setStep("scoring");
-    void runScoring(transcript, durationSeconds, selectedScenario, profile);
+    void runScoring(transcript, durationSeconds, selectedScenario, profile, callId, reason);
   }
 
-  function handlePracticeAgain() {
+  function handleEntitlementExhausted() {
+    setStepBeforePaywall("scenarios");
+    setStep("paywall");
+    void refreshEntitlement();
+  }
+
+  async function handlePracticeAgain() {
     if (!profile || !selectedScenario) return;
+    const current = (await refreshEntitlement()) ?? entitlement;
+    if (current && !current.canStartCall) {
+      setStepBeforePaywall("scenarios");
+      setStep("paywall");
+      return;
+    }
     setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
     setScoreResult(null);
     setScoringError(null);
@@ -244,6 +289,10 @@ export function TrainingSetup() {
 
   if (!loaded) return null;
 
+  if (step === "paywall") {
+    return <Paywall onBack={() => setStep(stepBeforePaywall)} />;
+  }
+
   if (step === "scoring" && selectedScenario) {
     return (
       <ScoreScreen
@@ -253,7 +302,7 @@ export function TrainingSetup() {
         loading={scoring}
         error={scoringError}
         transcript={callTranscript}
-        onPracticeAgain={handlePracticeAgain}
+        onPracticeAgain={() => void handlePracticeAgain()}
         onDone={handleScoreDone}
       />
     );
@@ -267,6 +316,7 @@ export function TrainingSetup() {
         scenario={selectedScenario}
         identity={prospectIdentity}
         onEnd={handleCallEnded}
+        onEntitlementExhausted={handleEntitlementExhausted}
       />
     );
   }
@@ -287,7 +337,7 @@ export function TrainingSetup() {
     return (
       <ScenarioPicker
         scenarios={scenarios}
-        onSelect={handleSelectScenario}
+        onSelect={(scenario) => void handleSelectScenario(scenario)}
         onBack={() => setStep("review")}
         voicePreference={voicePreference}
         onVoicePreferenceChange={setVoicePreference}

@@ -7,12 +7,15 @@ import { CoachPanel } from "@/components/call/CoachPanel";
 import { useRealtimeCall } from "@/lib/realtime/useRealtimeCall";
 import { CoachMode, CoachTip, ProspectIdentity, SalesProfile, Scenario, TranscriptEntry, TrainingProfile } from "@/lib/types";
 
+export type CallEndReason = "completed" | "timeout";
+
 interface CallScreenProps {
   salesProfile: SalesProfile;
   trainingProfile: TrainingProfile;
   scenario: Scenario;
   identity: ProspectIdentity;
-  onEnd: (transcript: TranscriptEntry[], durationSeconds: number) => void;
+  onEnd: (transcript: TranscriptEntry[], durationSeconds: number, callId: string, reason: CallEndReason) => void;
+  onEntitlementExhausted: () => void;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -23,11 +26,41 @@ const STATUS_LABEL: Record<string, string> = {
   error: "Connection error",
 };
 
-export function CallScreen({ salesProfile, trainingProfile, scenario, identity, onEnd }: CallScreenProps) {
-  const { status, transcript, error, speaking, start, stop, userAmplitudeRef, prospectAmplitudeRef } =
-    useRealtimeCall();
+function formatCallTimer(seconds: number): string {
+  const mm = Math.floor(seconds / 60);
+  const ss = seconds % 60;
+  const clock = `${mm}:${ss.toString().padStart(2, "0")}`;
+  if (seconds <= 10) return `Call ending in ${seconds} second${seconds === 1 ? "" : "s"}`;
+  if (seconds <= 30) return `${seconds} seconds remaining`;
+  if (seconds <= 60) return `${clock} remaining`;
+  return clock;
+}
+
+export function CallScreen({
+  salesProfile,
+  trainingProfile,
+  scenario,
+  identity,
+  onEnd,
+  onEntitlementExhausted,
+}: CallScreenProps) {
+  const {
+    status,
+    transcript,
+    error,
+    speaking,
+    start,
+    stop,
+    userAmplitudeRef,
+    prospectAmplitudeRef,
+    callId,
+    remainingSeconds,
+    timedOut,
+    entitlementExhausted,
+  } = useRealtimeCall();
   const startedRef = useRef(false);
   const callStartRef = useRef<number | null>(null);
+  const endedRef = useRef(false);
 
   const [coachMode, setCoachMode] = useState<CoachMode>("training");
   const [coachTip, setCoachTip] = useState<CoachTip | null>(null);
@@ -79,10 +112,30 @@ export function CallScreen({ salesProfile, trainingProfile, scenario, identity, 
     void analyze();
   }, [transcript, coachMode, salesProfile, trainingProfile]);
 
-  function handleEndCall() {
+  useEffect(() => {
+    if (!timedOut || endedRef.current || !callId) return;
+    endedRef.current = true;
     const durationSeconds = Math.round((Date.now() - (callStartRef.current ?? Date.now())) / 1000);
     stop();
-    onEnd(transcript, durationSeconds);
+    onEnd(transcript, durationSeconds, callId, "timeout");
+    // transcript/onEnd change every render as new deltas arrive — only re-run this when timedOut flips.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timedOut, callId]);
+
+  useEffect(() => {
+    // Rare race: entitlement ran out between TrainingSetup's pre-check and this
+    // mount actually reaching the server. No call was ever reserved here, so
+    // there's nothing to finalize — just hand the paywall back to TrainingSetup.
+    if (entitlementExhausted) onEntitlementExhausted();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entitlementExhausted]);
+
+  function handleEndCall() {
+    if (endedRef.current || !callId) return;
+    endedRef.current = true;
+    const durationSeconds = Math.round((Date.now() - (callStartRef.current ?? Date.now())) / 1000);
+    stop();
+    onEnd(transcript, durationSeconds, callId, "completed");
   }
 
   const dotClass =
@@ -110,6 +163,15 @@ export function CallScreen({ salesProfile, trainingProfile, scenario, identity, 
               {STATUS_LABEL[status]}
               {status === "connected" && speaking ? " · listening…" : ""}
             </span>
+            {remainingSeconds !== null && status === "connected" && (
+              <span
+                className={`font-medium tabular-nums ${
+                  remainingSeconds <= 30 ? "text-red-600 dark:text-red-400" : "text-zinc-500 dark:text-zinc-400"
+                }`}
+              >
+                · {formatCallTimer(remainingSeconds)}
+              </span>
+            )}
           </p>
         </div>
         <Button variant="secondary" onClick={handleEndCall}>

@@ -49,6 +49,13 @@ export function useRealtimeCall() {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
+  const [callId, setCallId] = useState<string | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
+  const [entitlementExhausted, setEntitlementExhausted] = useState(false);
+
+  const deadlineAtRef = useRef<number | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
@@ -98,6 +105,10 @@ export function useRealtimeCall() {
       cancelAnimationFrame(amplitudeFrameRef.current);
       amplitudeFrameRef.current = null;
     }
+    if (countdownIntervalRef.current !== null) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
     dcRef.current?.close();
     dcRef.current = null;
     pcRef.current?.getSenders().forEach((sender) => sender.track?.stop());
@@ -119,11 +130,41 @@ export function useRealtimeCall() {
     prospectAmplitudeRef.current = 0;
   }, []);
 
+  const startCountdown = useCallback(
+    (deadlineIso: string) => {
+      const deadline = new Date(deadlineIso).getTime();
+      deadlineAtRef.current = deadline;
+
+      const tick = () => {
+        const remaining = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+        setRemainingSeconds(remaining);
+        if (remaining <= 0) {
+          if (countdownIntervalRef.current !== null) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          setTimedOut(true);
+          cleanup();
+          setStatus((prev) => (prev === "idle" ? prev : "ended"));
+          setSpeaking(false);
+        }
+      };
+
+      tick();
+      countdownIntervalRef.current = setInterval(tick, 1000);
+    },
+    [cleanup]
+  );
+
   const start = useCallback(
     async ({ salesProfile, trainingProfile, scenario, identity }: StartArgs) => {
       setError(null);
       setStatus("connecting");
       setTranscript([]);
+      setCallId(null);
+      setRemainingSeconds(null);
+      setTimedOut(false);
+      setEntitlementExhausted(false);
 
       try {
         const tokenRes = await fetch("/api/realtime/session", {
@@ -133,9 +174,20 @@ export function useRealtimeCall() {
         });
         if (!tokenRes.ok) {
           const body = await tokenRes.json().catch(() => null);
+          if (tokenRes.status === 403 && body?.error === "entitlement_required") {
+            setEntitlementExhausted(true);
+            setStatus("error");
+            return;
+          }
           throw new Error(body?.error ?? "Failed to start call session.");
         }
-        const { value: ephemeralKey } = (await tokenRes.json()) as { value: string };
+        const {
+          value: ephemeralKey,
+          callId: newCallId,
+          deadlineAt,
+        } = (await tokenRes.json()) as { value: string; callId: string; deadlineAt: string };
+        setCallId(newCallId);
+        startCountdown(deadlineAt);
 
         const pc = new RTCPeerConnection();
         pcRef.current = pc;
@@ -238,13 +290,19 @@ export function useRealtimeCall() {
         const answerSdp = await sdpRes.text();
         await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
       } catch (err) {
+        // Note: if this failure happens after mark_call_started already ran
+        // server-side (WebRTC negotiation failing post-token-issuance), the
+        // entitlement stays consumed and the call_sessions row stays
+        // 'started' — the stale-call sweep in get_entitlement_status()
+        // reconciles it to 'timeout' later. This is a rare edge case and a
+        // bookkeeping-only consequence, not an entitlement/security issue.
         console.error("Failed to start realtime call", err);
         setError(err instanceof Error ? err.message : "Something went wrong starting the call.");
         setStatus("error");
         cleanup();
       }
     },
-    [cleanup, startAmplitudeLoop]
+    [cleanup, startAmplitudeLoop, startCountdown]
   );
 
   const stop = useCallback(() => {
@@ -253,5 +311,18 @@ export function useRealtimeCall() {
     setSpeaking(false);
   }, [cleanup]);
 
-  return { status, transcript, error, speaking, start, stop, userAmplitudeRef, prospectAmplitudeRef };
+  return {
+    status,
+    transcript,
+    error,
+    speaking,
+    start,
+    stop,
+    userAmplitudeRef,
+    prospectAmplitudeRef,
+    callId,
+    remainingSeconds,
+    timedOut,
+    entitlementExhausted,
+  };
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PRIMARY_LINK_CLASSES, SECONDARY_LINK_CLASSES } from "@/components/landing/linkButtonClasses";
+import { PRIMARY_LINK_CLASSES, SECONDARY_LINK_CLASSES } from "@/components/ui/linkButtonClasses";
 import { CREDIT_PACK_CALLS, CREDIT_PACK_PRICE_INR, TRIAL_CALLS, TRIAL_CALL_MINUTES } from "@/lib/config/pricing";
 
 export function Pricing() {
