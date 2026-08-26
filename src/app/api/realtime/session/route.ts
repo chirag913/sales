@@ -85,6 +85,12 @@ export async function POST(req: NextRequest) {
                 // more lead-in audio before the detected speech start.
                 silence_duration_ms: 750,
                 prefix_padding_ms: 500,
+                // Default threshold (0.5) picks up steady ambient noise (fan hum,
+                // room noise) as "speech started" — since interrupt_response is on,
+                // that falsely cuts the prospect off mid-response and can leave the
+                // turn stuck waiting for the (noise-sustained) "silence" that never
+                // comes. Raised so it takes actual talking volume to trigger.
+                threshold: 0.7,
               },
             },
             output: {
