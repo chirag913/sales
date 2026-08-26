@@ -11,6 +11,15 @@ import { createClient } from "@/lib/supabase/client";
 // "bought and used them all"; both read as "No calls remaining" to keep this
 // a small badge rather than an accounting dashboard.
 function usageBadgeText(entitlement: EntitlementStatus): string {
+  const trialText = `${entitlement.trialRemaining} free trial call${entitlement.trialRemaining === 1 ? "" : "s"}`;
+  const creditsText = `${entitlement.credits} credit${entitlement.credits === 1 ? "" : "s"}`;
+
+  // Buying credits is now reachable at any time (not just once the trial is
+  // exhausted), so both can be nonzero at once — surface both rather than
+  // silently hiding the credits someone just paid for.
+  if (entitlement.trialRemaining > 0 && entitlement.credits > 0) {
+    return `${trialText} + ${creditsText} remaining`;
+  }
   if (entitlement.trialRemaining > 0) {
     return `Free trial: ${entitlement.trialRemaining} call${entitlement.trialRemaining === 1 ? "" : "s"} remaining`;
   }

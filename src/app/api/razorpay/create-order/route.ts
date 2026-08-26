@@ -19,6 +19,10 @@ export async function POST() {
       currency: "INR",
       receipt: `credits_${userId.slice(0, 8)}_${Date.now()}`,
       notes: { userId, credits: String(CREDIT_PACK_CALLS) },
+      // Without this, a successful payment only reaches "authorized" and the
+      // money is never actually captured — it auto-voids after a few days.
+      // We'd have granted credits for a charge that was never collected.
+      payment_capture: true,
     });
 
     return NextResponse.json({
