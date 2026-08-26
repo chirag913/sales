@@ -53,18 +53,16 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
     <div className="relative">
       <div className="fixed right-4 top-4 z-50 flex items-center gap-3">
         {entitlement && !entitlement.isAdmin && (
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            {usageBadgeText(entitlement)}
-            {entitlement.trialRemaining === 0 && entitlement.credits === 0 && (
-              <>
-                {" · "}
-                <BuyCreditsButton
-                  variant="link"
-                  onSuccess={() => void fetchEntitlement().then((data) => data && setEntitlement(data))}
-                />
-              </>
-            )}
-          </span>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">{usageBadgeText(entitlement)}</span>
+        )}
+        {entitlement && (
+          // Always reachable, regardless of remaining balance or admin status —
+          // credits can be topped up anytime, not just once fully exhausted.
+          <BuyCreditsButton
+            variant="link"
+            className="text-xs text-zinc-500 dark:text-zinc-400"
+            onSuccess={() => void fetchEntitlement().then((data) => data && setEntitlement(data))}
+          />
         )}
         <button
           type="button"
