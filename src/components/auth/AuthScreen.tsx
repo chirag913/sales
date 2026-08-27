@@ -58,35 +58,48 @@ export function AuthScreen() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (mode === "sign-up") {
+      if (!fullName.trim() || !mobileNumber.trim() || !country || !city.trim()) {
+        setError("Please fill in your name, mobile number, country, and city.");
+        return;
+      }
+      if (!MOBILE_NUMBER_PATTERN.test(mobileNumber.trim())) {
+        setError("Enter a valid mobile number (digits only).");
+        return;
+      }
+    }
+    // Supabase's CAPTCHA protection setting is global to the project — it
+    // isn't sign-up-only, it also gates signInWithPassword and
+    // resetPasswordForEmail. Missing this on any of the three broke sign-in
+    // for every existing user, not just new sign-ups.
+    if (TURNSTILE_SITE_KEY && !captchaToken) {
+      setError("Please complete the verification.");
+      return;
+    }
+
     setLoading(true);
     try {
       const supabase = createClient();
+      const token = captchaToken ?? undefined;
+
       if (mode === "forgot-password") {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/reset-password`,
+          captchaToken: token,
         });
+        turnstileRef.current?.reset();
+        setCaptchaToken(null);
         if (resetError) throw resetError;
         setResetEmailSent(true);
         return;
       }
       if (mode === "sign-up") {
-        if (!fullName.trim() || !mobileNumber.trim() || !country || !city.trim()) {
-          setError("Please fill in your name, mobile number, country, and city.");
-          return;
-        }
-        if (!MOBILE_NUMBER_PATTERN.test(mobileNumber.trim())) {
-          setError("Enter a valid mobile number (digits only).");
-          return;
-        }
-        if (TURNSTILE_SITE_KEY && !captchaToken) {
-          setError("Please complete the verification.");
-          return;
-        }
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            captchaToken: captchaToken ?? undefined,
+            captchaToken: token,
             data: {
               full_name: fullName.trim(),
               mobile_number: mobileNumber.trim(),
@@ -104,7 +117,13 @@ export function AuthScreen() {
           return;
         }
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+          options: { captchaToken: token },
+        });
+        turnstileRef.current?.reset();
+        setCaptchaToken(null);
         if (signInError) throw signInError;
       }
       router.refresh();
@@ -246,16 +265,16 @@ export function AuthScreen() {
                 disabled={loading}
               />
             </label>
-
-            {TURNSTILE_SITE_KEY && (
-              <TurnstileWidget
-                ref={turnstileRef}
-                siteKey={TURNSTILE_SITE_KEY}
-                onVerify={setCaptchaToken}
-                onExpire={() => setCaptchaToken(null)}
-              />
-            )}
           </>
+        )}
+
+        {TURNSTILE_SITE_KEY && (
+          <TurnstileWidget
+            ref={turnstileRef}
+            siteKey={TURNSTILE_SITE_KEY}
+            onVerify={setCaptchaToken}
+            onExpire={() => setCaptchaToken(null)}
+          />
         )}
 
         {mode !== "forgot-password" && (
