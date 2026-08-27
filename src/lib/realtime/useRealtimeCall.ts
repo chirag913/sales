@@ -44,6 +44,14 @@ function finalizeEntry(transcript: TranscriptEntry[], id: string): TranscriptEnt
   return transcript.map((e) => (e.id === id ? { ...e, final: true } : e));
 }
 
+// Client-side noise gate thresholds — see startAmplitudeLoop for how these
+// are used. OPEN_THRESHOLD is a starting guess (0-1, same scale as
+// userAmplitudeRef) — tune up if real speech still gets gated out, or down
+// if noise still gets through. HOLD_MS keeps the gate open briefly after
+// amplitude dips so a natural mid-sentence pause doesn't get clipped.
+const NOISE_GATE_OPEN_THRESHOLD = 0.06;
+const NOISE_GATE_HOLD_MS = 500;
+
 export function useRealtimeCall() {
   const [status, setStatus] = useState<CallStatus>("idle");
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
@@ -71,6 +79,14 @@ export function useRealtimeCall() {
   const prospectAmplitudeRef = useRef(0);
   const amplitudeFrameRef = useRef<number | null>(null);
 
+  // Client-side noise gate: mutes the mic track sent to OpenAI whenever
+  // amplitude is below the ambient-noise floor, so steady background noise
+  // (fan hum, AC) never reaches the realtime API's VAD at all — regardless
+  // of how well (or not) the browser/OS's own noiseSuppression is actually
+  // working on a given device.
+  const noiseGateRef = useRef<GainNode | null>(null);
+  const noiseGateOpenUntilRef = useRef(0);
+
   const startAmplitudeLoop = useCallback(() => {
     const tick = () => {
       const userAnalyser = userAnalyserRef.current;
@@ -79,7 +95,19 @@ export function useRealtimeCall() {
         userAnalyser.getByteFrequencyData(userData);
         let sum = 0;
         for (let i = 0; i < userData.length; i++) sum += userData[i];
-        userAmplitudeRef.current = sum / userData.length / 255;
+        const amplitude = sum / userData.length / 255;
+        userAmplitudeRef.current = amplitude;
+
+        const gate = noiseGateRef.current;
+        if (gate) {
+          const now = performance.now();
+          if (amplitude > NOISE_GATE_OPEN_THRESHOLD) {
+            gate.gain.value = 1;
+            noiseGateOpenUntilRef.current = now + NOISE_GATE_HOLD_MS;
+          } else if (now > noiseGateOpenUntilRef.current) {
+            gate.gain.value = 0;
+          }
+        }
       } else {
         userAmplitudeRef.current = 0;
       }
@@ -128,6 +156,8 @@ export function useRealtimeCall() {
     prospectDataArrayRef.current = null;
     userAmplitudeRef.current = 0;
     prospectAmplitudeRef.current = 0;
+    noiseGateRef.current = null;
+    noiseGateOpenUntilRef.current = 0;
   }, []);
 
   const startCountdown = useCallback(
@@ -223,7 +253,6 @@ export function useRealtimeCall() {
           },
         });
         streamRef.current = mediaStream;
-        mediaStream.getTracks().forEach((track) => pc.addTrack(track, mediaStream));
 
         const userSource = audioContext.createMediaStreamSource(mediaStream);
         const userAnalyser = audioContext.createAnalyser();
@@ -231,6 +260,20 @@ export function useRealtimeCall() {
         userSource.connect(userAnalyser);
         userAnalyserRef.current = userAnalyser;
         userDataArrayRef.current = new Uint8Array(userAnalyser.frequencyBinCount);
+
+        // Route the mic through a gain node acting as a noise gate (opened/
+        // closed every frame in startAmplitudeLoop based on amplitude) before
+        // it ever reaches the peer connection — belt-and-suspenders on top of
+        // the browser-level noiseSuppression constraint above, since that
+        // constraint is advisory and not equally effective on every device.
+        const noiseGate = audioContext.createGain();
+        noiseGate.gain.value = 0;
+        userSource.connect(noiseGate);
+        noiseGateRef.current = noiseGate;
+
+        const gatedDestination = audioContext.createMediaStreamDestination();
+        noiseGate.connect(gatedDestination);
+        gatedDestination.stream.getTracks().forEach((track) => pc.addTrack(track, gatedDestination.stream));
 
         const dc = pc.createDataChannel("oai-events");
         dcRef.current = dc;
