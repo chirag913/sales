@@ -268,15 +268,6 @@ export function AuthScreen() {
           </>
         )}
 
-        {TURNSTILE_SITE_KEY && (
-          <TurnstileWidget
-            ref={turnstileRef}
-            siteKey={TURNSTILE_SITE_KEY}
-            onVerify={setCaptchaToken}
-            onExpire={() => setCaptchaToken(null)}
-          />
-        )}
-
         {mode !== "forgot-password" && (
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Password</span>
@@ -304,6 +295,15 @@ export function AuthScreen() {
           >
             Forgot password?
           </button>
+        )}
+
+        {TURNSTILE_SITE_KEY && (
+          <TurnstileWidget
+            ref={turnstileRef}
+            siteKey={TURNSTILE_SITE_KEY}
+            onVerify={setCaptchaToken}
+            onExpire={() => setCaptchaToken(null)}
+          />
         )}
 
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
