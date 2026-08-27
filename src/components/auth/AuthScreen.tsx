@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ReactNode, useState } from "react";
+import { FormEvent, ReactNode, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -8,6 +8,9 @@ import { INPUT_CLASSES } from "@/components/ui/inputClasses";
 import { Logo } from "@/components/ui/Logo";
 import { createClient } from "@/lib/supabase/client";
 import { COUNTRIES } from "@/lib/constants/countries";
+import { TurnstileHandle, TurnstileWidget } from "@/components/auth/Turnstile";
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 type Mode = "sign-in" | "sign-up" | "forgot-password";
 
@@ -38,10 +41,12 @@ export function AuthScreen() {
   const [mobileNumber, setMobileNumber] = useState("");
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkEmail, setCheckEmail] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   function resetToSignIn() {
     setError(null);
@@ -73,10 +78,15 @@ export function AuthScreen() {
           setError("Enter a valid mobile number (digits only).");
           return;
         }
+        if (TURNSTILE_SITE_KEY && !captchaToken) {
+          setError("Please complete the verification.");
+          return;
+        }
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
+            captchaToken: captchaToken ?? undefined,
             data: {
               full_name: fullName.trim(),
               mobile_number: mobileNumber.trim(),
@@ -85,6 +95,8 @@ export function AuthScreen() {
             },
           },
         });
+        turnstileRef.current?.reset();
+        setCaptchaToken(null);
         if (signUpError) throw signUpError;
         if (!data.session) {
           // Email confirmation is required before a session exists.
@@ -234,6 +246,15 @@ export function AuthScreen() {
                 disabled={loading}
               />
             </label>
+
+            {TURNSTILE_SITE_KEY && (
+              <TurnstileWidget
+                ref={turnstileRef}
+                siteKey={TURNSTILE_SITE_KEY}
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken(null)}
+              />
+            )}
           </>
         )}
 
