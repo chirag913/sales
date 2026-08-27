@@ -40,9 +40,10 @@ interface BuyCreditsButtonProps {
   onSuccess: () => void;
   variant?: "button" | "link";
   className?: string;
+  label?: string;
 }
 
-export function BuyCreditsButton({ onSuccess, variant = "button", className }: BuyCreditsButtonProps) {
+export function BuyCreditsButton({ onSuccess, variant = "button", className, label: labelOverride }: BuyCreditsButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,7 +103,7 @@ export function BuyCreditsButton({ onSuccess, variant = "button", className }: B
     }
   }
 
-  const label = loading ? "Please wait…" : `Buy ${CREDIT_PACK_CALLS} calls — ₹${CREDIT_PACK_PRICE_INR}`;
+  const label = loading ? "Please wait…" : (labelOverride ?? `Buy ${CREDIT_PACK_CALLS} calls — ₹${CREDIT_PACK_PRICE_INR}`);
 
   if (variant === "link") {
     return (

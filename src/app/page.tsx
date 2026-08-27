@@ -1,10 +1,11 @@
+import { CallJourney } from "@/components/landing/CallJourney";
+import { CoachHighlight } from "@/components/landing/CoachHighlight";
 import { Hero } from "@/components/landing/Hero";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { IcpPreview } from "@/components/landing/IcpPreview";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Pricing } from "@/components/landing/Pricing";
-import { TrustStrip } from "@/components/landing/TrustStrip";
 import { WhoItsFor } from "@/components/landing/WhoItsFor";
 
 export default function LandingPage() {
@@ -12,9 +13,10 @@ export default function LandingPage() {
     <div className="min-h-screen">
       <LandingNav />
       <Hero />
-      <TrustStrip />
-      <WhoItsFor />
+      <CallJourney />
+      <CoachHighlight />
       <IcpPreview />
+      <WhoItsFor />
       <HowItWorks />
       <Pricing />
       <LandingFooter />

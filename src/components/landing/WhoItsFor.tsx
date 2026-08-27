@@ -1,32 +1,33 @@
-import { Card } from "@/components/ui/Card";
+import { RevealOnScroll } from "@/components/landing/RevealOnScroll";
 
-const AUDIENCE_CARDS = [
+const AUDIENCES = [
   {
-    icon: "🎯",
-    title: "Sales reps",
-    description: "Warm up on a realistic, objection-throwing prospect before you spend a real lead on a bad opening.",
+    label: "Agency founders",
+    copy: "Practice pitching your service to US decision-makers before spending a real lead.",
   },
   {
-    icon: "🎤",
-    title: "Job-seekers",
-    description: "Got a roleplay interview coming up? Rehearse the exact scenario against an AI that pushes back like a real panel would.",
+    label: "Freelancers",
+    copy: "Stop improvising on your first sales call. Rehearse before the real conversation.",
   },
   {
-    icon: "🚀",
-    title: "Founders & small teams",
-    description: "Doing your own outbound with no sales background? Practice the call before you make it — no sales call required to try it.",
+    label: "Outbound teams",
+    copy: "Train reps against realistic prospects before they touch your real lead list.",
   },
 ];
 
 export function WhoItsFor() {
   return (
-    <section className="mx-auto max-w-6xl px-6 py-20">
-      <h2 className="text-center text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Who it&apos;s for</h2>
-      <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-3">
-        {AUDIENCE_CARDS.map((card) => (
-          <Card key={card.title} icon={card.icon} title={card.title}>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">{card.description}</p>
-          </Card>
+    <section className="mx-auto max-w-5xl px-6 py-24 sm:py-32">
+      <h2 className="max-w-xl text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
+        Built for Indian agencies and freelancers selling to international clients.
+      </h2>
+
+      <div className="mt-16 grid grid-cols-1 gap-12 sm:grid-cols-3 sm:gap-8">
+        {AUDIENCES.map((audience, i) => (
+          <RevealOnScroll key={audience.label} delayMs={i * 100} className="border-t border-zinc-200 pt-5 dark:border-zinc-800">
+            <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{audience.label}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">{audience.copy}</p>
+          </RevealOnScroll>
         ))}
       </div>
     </section>
