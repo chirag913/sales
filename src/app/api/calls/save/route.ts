@@ -28,6 +28,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // finalize_call() only transitions a row that is (id=callId, user_id=caller,
+  // status='started') and is silently a no-op otherwise — so without this
+  // check, a callId that was never reserved (or already finalized) would
+  // still fall through to tagObjections() (a real OpenAI call) and an insert
+  // into calls below. Checking first means any authenticated user could
+  // otherwise fabricate arbitrary "completed call" rows and spend OpenAI
+  // tokens for free, with no connection to their credit/trial balance.
+  const { data: session } = await supabase
+    .from("call_sessions")
+    .select("id")
+    .eq("id", callId)
+    .eq("status", "started")
+    .maybeSingle();
+
+  if (!session) {
+    return NextResponse.json({ error: "No active call session." }, { status: 403 });
+  }
+
   try {
     // Idempotent — a duplicate save (retry, double-fired end event) is a
     // no-op here since finalize_call only transitions a still-'started' row.

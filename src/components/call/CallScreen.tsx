@@ -87,6 +87,7 @@ export function CallScreen({
     lastCoachedIdRef.current = last.id;
 
     const analyze = async () => {
+      if (!callId) return;
       coachBusyRef.current = true;
       setCoachLoading(true);
       try {
@@ -94,6 +95,7 @@ export function CallScreen({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            callId,
             transcript: transcript.filter((e) => e.final).slice(-20),
             salesProfile,
             trainingProfile,
@@ -111,7 +113,7 @@ export function CallScreen({
     };
 
     void analyze();
-  }, [transcript, coachMode, salesProfile, trainingProfile]);
+  }, [transcript, coachMode, salesProfile, trainingProfile, callId]);
 
   useEffect(() => {
     if (!timedOut || endedRef.current || !callId) return;

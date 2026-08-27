@@ -203,6 +203,7 @@ export function TrainingSetup() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          callId,
           transcript,
           salesProfile,
           trainingProfile,
