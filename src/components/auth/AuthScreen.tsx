@@ -7,8 +7,14 @@ import { Button } from "@/components/ui/Button";
 import { INPUT_CLASSES } from "@/components/ui/inputClasses";
 import { Logo } from "@/components/ui/Logo";
 import { createClient } from "@/lib/supabase/client";
+import { COUNTRIES } from "@/lib/constants/countries";
 
 type Mode = "sign-in" | "sign-up" | "forgot-password";
+
+// Digits only, optional leading "+", 7-15 digits — long enough to reject
+// obviously-invalid input (letters, a 3-digit number) without imposing a
+// specific national format.
+const MOBILE_NUMBER_PATTERN = /^\+?[0-9]{7,15}$/;
 
 function AuthCard({ children }: { children: ReactNode }) {
   return (
@@ -28,6 +34,10 @@ export function AuthScreen() {
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkEmail, setCheckEmail] = useState(false);
@@ -55,7 +65,26 @@ export function AuthScreen() {
         return;
       }
       if (mode === "sign-up") {
-        const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+        if (!fullName.trim() || !mobileNumber.trim() || !country || !city.trim()) {
+          setError("Please fill in your name, mobile number, country, and city.");
+          return;
+        }
+        if (!MOBILE_NUMBER_PATTERN.test(mobileNumber.trim())) {
+          setError("Enter a valid mobile number (digits only).");
+          return;
+        }
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName.trim(),
+              mobile_number: mobileNumber.trim(),
+              country,
+              city: city.trim(),
+            },
+          },
+        });
         if (signUpError) throw signUpError;
         if (!data.session) {
           // Email confirmation is required before a session exists.
@@ -142,6 +171,71 @@ export function AuthScreen() {
             disabled={loading}
           />
         </label>
+
+        {mode === "sign-up" && (
+          <>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Full name</span>
+              <input
+                type="text"
+                required
+                autoComplete="name"
+                className={INPUT_CLASSES}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                disabled={loading}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Mobile number</span>
+              <input
+                type="tel"
+                required
+                autoComplete="tel"
+                placeholder="e.g. +919876543210"
+                className={INPUT_CLASSES}
+                value={mobileNumber}
+                onChange={(e) => setMobileNumber(e.target.value)}
+                disabled={loading}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Country</span>
+              <select
+                required
+                autoComplete="country-name"
+                className={INPUT_CLASSES}
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                disabled={loading}
+              >
+                <option value="" disabled>
+                  Select a country
+                </option>
+                {COUNTRIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">City</span>
+              <input
+                type="text"
+                required
+                autoComplete="address-level2"
+                className={INPUT_CLASSES}
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                disabled={loading}
+              />
+            </label>
+          </>
+        )}
 
         {mode !== "forgot-password" && (
           <label className="flex flex-col gap-1.5">
