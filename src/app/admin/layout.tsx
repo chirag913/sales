@@ -14,11 +14,17 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const { data: authData } = await supabase.auth.getClaims();
   if (!authData?.claims) redirect("/");
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("users_profile")
     .select("is_admin")
     .eq("id", authData.claims.sub)
     .maybeSingle();
+
+  if (error) {
+    // A query failure isn't the same as "not admin" — was previously
+    // treated identically, which silently hid the real cause here.
+    console.error("admin layout: users_profile lookup failed", authData.claims.sub, error);
+  }
 
   if (!profile?.is_admin) redirect("/");
 
