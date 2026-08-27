@@ -1,20 +1,20 @@
 "use client";
 
 import { RefObject, useEffect, useRef } from "react";
+import { ProspectAvatar } from "@/components/ui/ProspectAvatar";
 import { CallStatus } from "@/lib/realtime/useRealtimeCall";
 import { ProspectIdentity } from "@/lib/types";
 
-interface AmplitudeOrbProps {
+interface AmplitudeBarsProps {
   amplitudeRef: RefObject<number>;
   label: string;
-  colorClass: string;
 }
 
 // Per-bar phase/weight so bars don't move in lockstep — purely cosmetic variation
 // layered on top of the real amplitude value, not synthetic data.
 const BAR_PROFILE = [0.6, 0.85, 1, 0.85, 0.6];
 
-function AmplitudeBars({ amplitudeRef, label, colorClass }: AmplitudeOrbProps) {
+function AmplitudeBars({ amplitudeRef, label }: AmplitudeBarsProps) {
   const barRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
@@ -36,14 +36,14 @@ function AmplitudeBars({ amplitudeRef, label, colorClass }: AmplitudeOrbProps) {
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="flex h-24 items-end gap-1.5 sm:h-32">
+      <div className="flex h-12 items-end gap-1">
         {BAR_PROFILE.map((_, i) => (
           <div
             key={i}
             ref={(el) => {
               barRefs.current[i] = el;
             }}
-            className={`w-2.5 rounded-full sm:w-3 ${colorClass}`}
+            className="w-2 rounded-full bg-zinc-900 dark:bg-zinc-100"
             style={{ height: "14%", willChange: "height" }}
           />
         ))}
@@ -62,9 +62,14 @@ interface CallVisualProps {
 
 export function CallVisual({ userAmplitudeRef, prospectAmplitudeRef, identity, status }: CallVisualProps) {
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-10 rounded-2xl border border-zinc-200/70 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-950 sm:flex-row sm:gap-20">
-      <AmplitudeBars amplitudeRef={userAmplitudeRef} label="You" colorClass="bg-zinc-900 dark:bg-zinc-100" />
-      <AmplitudeBars amplitudeRef={prospectAmplitudeRef} label={identity.firstName} colorClass="bg-emerald-500" />
+    <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-12 rounded-3xl border border-zinc-200/70 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="flex flex-col items-center gap-3">
+        <ProspectAvatar identity={identity} size="xl" amplitudeRef={prospectAmplitudeRef} />
+        <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">{identity.firstName}</p>
+      </div>
+
+      <AmplitudeBars amplitudeRef={userAmplitudeRef} label="You" />
+
       {(status === "idle" || status === "connecting") && (
         <p className="absolute bottom-6 text-xs text-zinc-400 dark:text-zinc-500">Connecting…</p>
       )}

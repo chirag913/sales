@@ -2,8 +2,10 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { History, LogOut } from "lucide-react";
 import { BuyCreditsButton } from "@/components/onboarding/BuyCreditsButton";
+import { Logo } from "@/components/ui/Logo";
 import { EntitlementStatus } from "@/lib/entitlement/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -39,8 +41,14 @@ async function fetchEntitlement(): Promise<EntitlementStatus | null> {
   }
 }
 
+const NAV_LINKS = [
+  { href: "/practice", label: "Practice" },
+  { href: "/history", label: "History" },
+];
+
 export function AuthenticatedShell({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [entitlement, setEntitlement] = useState<EntitlementStatus | null>(null);
 
   useEffect(() => {
@@ -60,35 +68,64 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="relative">
-      <div className="fixed right-4 top-4 z-50 flex items-center gap-3">
-        {entitlement && !entitlement.isAdmin && (
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">{usageBadgeText(entitlement)}</span>
-        )}
-        {entitlement && (
-          // Always reachable, regardless of remaining balance or admin status —
-          // credits can be topped up anytime, not just once fully exhausted.
-          <BuyCreditsButton
-            variant="link"
-            className="text-xs text-zinc-500 dark:text-zinc-400"
-            onSuccess={() => void fetchEntitlement().then((data) => data && setEntitlement(data))}
-          />
-        )}
-        <Link
-          href="/history"
-          className="text-xs text-zinc-400 underline-offset-4 hover:underline dark:text-zinc-500"
-        >
-          History
-        </Link>
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="text-xs text-zinc-400 underline-offset-4 hover:underline dark:text-zinc-500"
-        >
-          Sign out
-        </button>
-      </div>
-      {children}
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-black/90">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
+          <div className="flex items-center gap-8">
+            <Link href="/practice" className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+              <Logo />
+            </Link>
+            <nav className="hidden items-center gap-6 font-mono text-xs font-medium tracking-wide sm:flex">
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={
+                    pathname === link.href
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+                  }
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {entitlement && !entitlement.isAdmin && (
+              <span className="hidden rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 sm:inline-block">
+                {usageBadgeText(entitlement)}
+              </span>
+            )}
+            {entitlement && (
+              // Always reachable, regardless of remaining balance or admin status —
+              // credits can be topped up anytime, not just once fully exhausted.
+              <BuyCreditsButton
+                variant="link"
+                className="text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                onSuccess={() => void fetchEntitlement().then((data) => data && setEntitlement(data))}
+              />
+            )}
+            <button
+              type="button"
+              onClick={handleSignOut}
+              aria-label="Sign out"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
+            >
+              <LogOut className="h-4 w-4" aria-hidden />
+            </button>
+            <Link
+              href="/history"
+              aria-label="Call history"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-200 sm:hidden"
+            >
+              <History className="h-4 w-4" aria-hidden />
+            </Link>
+          </div>
+        </div>
+      </header>
+      <div className="flex-1">{children}</div>
     </div>
   );
 }

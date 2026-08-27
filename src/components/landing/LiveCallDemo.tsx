@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "@/components/landing/useReducedMotion";
+import { useEffect, useState } from "react";
+import { useCountUp } from "@/lib/hooks/useCountUp";
+import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
 
 /* ------------------------------------------------------------------ */
 /* Shared call-panel visual atoms — the signature BetterCallz visual  */
@@ -97,32 +98,6 @@ export function CoachCallout({
       </p>
     </div>
   );
-}
-
-export function useCountUp(target: number, active: boolean, durationMs = 900) {
-  const [value, setValue] = useState(0);
-  const reducedMotion = useReducedMotion();
-  const frameRef = useRef<number | undefined>(undefined);
-
-  useEffect(() => {
-    if (!active || reducedMotion) return;
-
-    const start = performance.now();
-    function tick(now: number) {
-      const progress = Math.min((now - start) / durationMs, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(eased * target));
-      if (progress < 1) frameRef.current = requestAnimationFrame(tick);
-    }
-    frameRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (frameRef.current) cancelAnimationFrame(frameRef.current);
-    };
-  }, [active, target, durationMs, reducedMotion]);
-
-  if (reducedMotion) return active ? target : 0;
-
-  return value;
 }
 
 export function ScoreReadout({ value, active, label = "CALL SCORE" }: { value: number; active: boolean; label?: string }) {

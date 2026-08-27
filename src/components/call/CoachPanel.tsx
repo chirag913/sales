@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle, TrendingUp, XCircle } from "lucide-react";
 import { CoachMode, CoachTip } from "@/lib/types";
 
 interface CoachPanelProps {
@@ -9,17 +10,20 @@ interface CoachPanelProps {
   loading: boolean;
 }
 
-const TYPE_STYLE: Record<CoachTip["type"], { emoji: string; className: string }> = {
+const TYPE_STYLE: Record<CoachTip["type"], { icon: typeof AlertTriangle; iconClassName: string; className: string }> = {
   objection: {
-    emoji: "🟡",
+    icon: AlertTriangle,
+    iconClassName: "text-amber-600 dark:text-amber-400",
     className: "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30",
   },
   buying_signal: {
-    emoji: "🟢",
+    icon: TrendingUp,
+    iconClassName: "text-emerald-600 dark:text-emerald-400",
     className: "border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30",
   },
   mistake: {
-    emoji: "🔴",
+    icon: XCircle,
+    iconClassName: "text-red-600 dark:text-red-400",
     className: "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/30",
   },
 };
@@ -57,17 +61,23 @@ export function CoachPanel({ mode, onModeChange, tip, loading }: CoachPanelProps
         {mode === "exam" ? (
           <p className="text-xs text-zinc-400 dark:text-zinc-500">Exam mode — no live coaching. You&apos;re on your own.</p>
         ) : tip ? (
-          <div className={`rounded-xl border p-3 ${TYPE_STYLE[tip.type].className}`}>
-            <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">
-              {TYPE_STYLE[tip.type].emoji} {tip.label}
-            </p>
-            <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{tip.note}</p>
-            {mode === "training" && tip.suggestedResponse && (
-              <p className="mt-2 text-sm italic text-zinc-600 dark:text-zinc-400">
-                Suggested: &ldquo;{tip.suggestedResponse}&rdquo;
-              </p>
-            )}
-          </div>
+          (() => {
+            const Icon = TYPE_STYLE[tip.type].icon;
+            return (
+              <div className={`rounded-xl border p-3 ${TYPE_STYLE[tip.type].className}`}>
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200">
+                  <Icon className={`h-3.5 w-3.5 ${TYPE_STYLE[tip.type].iconClassName}`} aria-hidden />
+                  {tip.label}
+                </p>
+                <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{tip.note}</p>
+                {mode === "training" && tip.suggestedResponse && (
+                  <p className="mt-2 text-sm italic text-zinc-600 dark:text-zinc-400">
+                    Suggested: &ldquo;{tip.suggestedResponse}&rdquo;
+                  </p>
+                )}
+              </div>
+            );
+          })()
         ) : (
           <p className="text-xs text-zinc-400 dark:text-zinc-500">{loading ? "Listening…" : "Coach is watching quietly."}</p>
         )}

@@ -2,26 +2,34 @@
 
 import { Button } from "@/components/ui/Button";
 import { CallResultDetail } from "@/components/call/CallResultDetail";
-import { CallScoreResult, Scenario, TranscriptEntry } from "@/lib/types";
+import { CallScoreResult, ProspectIdentity, Scenario, TranscriptEntry } from "@/lib/types";
 
 interface ScoreScreenProps {
   scenario: Scenario;
+  identity: ProspectIdentity;
   durationSeconds: number;
   result: CallScoreResult | null;
   loading: boolean;
   error: string | null;
   transcript: TranscriptEntry[] | null;
+  previousBestScore?: number;
+  previousScore?: number;
+  callNumber?: number;
   onPracticeAgain: () => void;
   onDone: () => void;
 }
 
 export function ScoreScreen({
   scenario,
+  identity,
   durationSeconds,
   result,
   loading,
   error,
   transcript,
+  previousBestScore,
+  previousScore,
+  callNumber,
   onPracticeAgain,
   onDone,
 }: ScoreScreenProps) {
@@ -50,7 +58,16 @@ export function ScoreScreen({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-16">
-      <CallResultDetail scenario={scenario} durationSeconds={durationSeconds} result={result} transcript={transcript} />
+      <CallResultDetail
+        scenario={scenario}
+        identity={identity}
+        durationSeconds={durationSeconds}
+        result={result}
+        transcript={transcript}
+        previousBestScore={previousBestScore}
+        previousScore={previousScore}
+        callNumber={callNumber}
+      />
 
       <div className="mt-10 flex justify-center gap-3">
         <Button variant="secondary" onClick={onDone}>

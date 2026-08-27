@@ -1,5 +1,7 @@
 "use client";
 
+import { INPUT_CLASSES } from "@/components/ui/inputClasses";
+
 interface Option {
   value: string;
   label: string;
@@ -17,9 +19,6 @@ interface FormFieldProps {
   prefix?: string;
 }
 
-const inputClasses =
-  "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-100 dark:focus:ring-zinc-100 disabled:cursor-not-allowed disabled:opacity-50";
-
 export function FormField({
   label,
   value,
@@ -36,14 +35,14 @@ export function FormField({
       <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}</span>
       {type === "textarea" ? (
         <textarea
-          className={`${inputClasses} min-h-[80px] resize-y`}
+          className={`${INPUT_CLASSES} min-h-[80px] resize-y`}
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
         />
       ) : type === "select" ? (
-        <select className={inputClasses} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
+        <select className={INPUT_CLASSES} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
           {options?.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
@@ -56,7 +55,7 @@ export function FormField({
             {prefix}
           </span>
           <input
-            className={`${inputClasses} pl-6`}
+            className={`${INPUT_CLASSES} pl-6`}
             type="text"
             value={value}
             placeholder={placeholder}
@@ -66,7 +65,7 @@ export function FormField({
         </div>
       ) : (
         <input
-          className={inputClasses}
+          className={INPUT_CLASSES}
           type="text"
           value={value}
           placeholder={placeholder}

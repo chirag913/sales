@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { ProspectAvatar } from "@/components/ui/ProspectAvatar";
 import { CallVisual } from "@/components/call/CallVisual";
 import { CoachPanel } from "@/components/call/CoachPanel";
 import { useRealtimeCall } from "@/lib/realtime/useRealtimeCall";
@@ -150,29 +151,32 @@ export function CallScreen({
   return (
     <div className="mx-auto flex h-[100dvh] w-full max-w-4xl flex-col px-6 py-6">
       <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
-        <div>
-          <p className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-            {identity.fullName} <span className="font-normal text-zinc-500 dark:text-zinc-400">— {identity.title}, {identity.company}</span>
-          </p>
-          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-            {scenario.icon} {scenario.name} · {scenario.difficulty}
-          </p>
-          <p className="mt-1 flex items-center gap-2 text-sm">
-            <span className={`h-2 w-2 rounded-full ${dotClass}`} />
-            <span className="text-zinc-500 dark:text-zinc-400">
-              {STATUS_LABEL[status]}
-              {status === "connected" && speaking ? " · listening…" : ""}
-            </span>
-            {remainingSeconds !== null && status === "connected" && (
-              <span
-                className={`font-medium tabular-nums ${
-                  remainingSeconds <= 30 ? "text-red-600 dark:text-red-400" : "text-zinc-500 dark:text-zinc-400"
-                }`}
-              >
-                · {formatCallTimer(remainingSeconds)}
+        <div className="flex items-center gap-3">
+          <ProspectAvatar identity={identity} size="sm" />
+          <div>
+            <p className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+              {identity.fullName} <span className="font-normal text-zinc-500 dark:text-zinc-400">— {identity.title}, {identity.company}</span>
+            </p>
+            <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+              {scenario.icon} {scenario.name} · {scenario.difficulty}
+            </p>
+            <p className="mt-1 flex items-center gap-2 text-sm">
+              <span className={`h-2 w-2 rounded-full ${dotClass}`} />
+              <span className="text-zinc-500 dark:text-zinc-400">
+                {STATUS_LABEL[status]}
+                {status === "connected" && speaking ? " · listening…" : ""}
               </span>
-            )}
-          </p>
+              {remainingSeconds !== null && status === "connected" && (
+                <span
+                  className={`font-medium tabular-nums ${
+                    remainingSeconds <= 30 ? "text-red-600 dark:text-red-400" : "text-zinc-500 dark:text-zinc-400"
+                  }`}
+                >
+                  · {formatCallTimer(remainingSeconds)}
+                </span>
+              )}
+            </p>
+          </div>
         </div>
         <Button variant="secondary" onClick={handleEndCall}>
           End Call

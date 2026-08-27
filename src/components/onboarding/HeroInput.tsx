@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { PROSPECT_MARKET_OPTIONS, ProspectMarket } from "@/lib/types";
 
@@ -94,8 +95,15 @@ export function HeroInput({ onSubmit, loading, error }: HeroInputProps) {
         {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <div className="mt-8 flex justify-center">
-          <Button type="submit" disabled={!description.trim() || loading} className="px-6 py-3 text-base">
-            {loading ? "Building your training…" : "✨ Build My Training"}
+          <Button type="submit" disabled={!description.trim() || loading} className="gap-2 px-6 py-3 text-base">
+            {loading ? (
+              "Building your training…"
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" aria-hidden />
+                Build My Training
+              </>
+            )}
           </Button>
         </div>
       </form>

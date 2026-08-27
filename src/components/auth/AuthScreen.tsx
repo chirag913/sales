@@ -1,14 +1,27 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, ReactNode, useState } from "react";
 import { useRouter } from "next/navigation";
+import { MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { INPUT_CLASSES } from "@/components/ui/inputClasses";
+import { Logo } from "@/components/ui/Logo";
 import { createClient } from "@/lib/supabase/client";
 
 type Mode = "sign-in" | "sign-up" | "forgot-password";
 
-const inputClasses =
-  "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-100 dark:focus:ring-zinc-100 disabled:cursor-not-allowed disabled:opacity-50";
+function AuthCard({ children }: { children: ReactNode }) {
+  return (
+    <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-sm flex-col items-center justify-center px-6 py-16">
+      <span className="mb-8 text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+        <Logo />
+      </span>
+      <div className="shadow-premium w-full rounded-3xl border border-zinc-200/70 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-950">
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export function AuthScreen() {
   const router = useRouter();
@@ -63,34 +76,48 @@ export function AuthScreen() {
 
   if (checkEmail) {
     return (
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-sm flex-col items-center justify-center px-6 py-16 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Check your email</h1>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          We sent a confirmation link to {email}. Confirm your account, then sign in below.
-        </p>
-        <Button variant="secondary" className="mt-6" onClick={resetToSignIn}>
-          Back to sign in
-        </Button>
-      </div>
+      <AuthCard>
+        <div className="flex flex-col items-center text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+            <MailCheck className="h-5 w-5" aria-hidden />
+          </span>
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Check your email
+          </h1>
+          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+            We sent a confirmation link to {email}. Confirm your account, then sign in below.
+          </p>
+          <Button variant="secondary" className="mt-6" onClick={resetToSignIn}>
+            Back to sign in
+          </Button>
+        </div>
+      </AuthCard>
     );
   }
 
   if (resetEmailSent) {
     return (
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-sm flex-col items-center justify-center px-6 py-16 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Check your email</h1>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          If an account exists for {email}, we sent a link to reset your password.
-        </p>
-        <Button variant="secondary" className="mt-6" onClick={resetToSignIn}>
-          Back to sign in
-        </Button>
-      </div>
+      <AuthCard>
+        <div className="flex flex-col items-center text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+            <MailCheck className="h-5 w-5" aria-hidden />
+          </span>
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Check your email
+          </h1>
+          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+            If an account exists for {email}, we sent a link to reset your password.
+          </p>
+          <Button variant="secondary" className="mt-6" onClick={resetToSignIn}>
+            Back to sign in
+          </Button>
+        </div>
+      </AuthCard>
     );
   }
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-sm flex-col justify-center px-6 py-16">
+    <AuthCard>
       <h1 className="text-center text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
         {mode === "sign-in" ? "Sign in" : mode === "sign-up" ? "Create an account" : "Reset your password"}
       </h1>
@@ -109,7 +136,7 @@ export function AuthScreen() {
             type="email"
             required
             autoComplete="email"
-            className={inputClasses}
+            className={INPUT_CLASSES}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading}
@@ -124,7 +151,7 @@ export function AuthScreen() {
               required
               minLength={6}
               autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-              className={inputClasses}
+              className={INPUT_CLASSES}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
@@ -162,7 +189,7 @@ export function AuthScreen() {
         <button
           type="button"
           onClick={resetToSignIn}
-          className="mt-6 text-center text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
+          className="mt-6 w-full text-center text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
         >
           Back to sign in
         </button>
@@ -173,11 +200,11 @@ export function AuthScreen() {
             setError(null);
             setMode((m) => (m === "sign-in" ? "sign-up" : "sign-in"));
           }}
-          className="mt-6 text-center text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
+          className="mt-6 w-full text-center text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
         >
           {mode === "sign-in" ? "Need an account? Sign up" : "Already have an account? Sign in"}
         </button>
       )}
-    </div>
+    </AuthCard>
   );
 }

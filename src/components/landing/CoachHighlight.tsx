@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useCountUp } from "@/components/landing/LiveCallDemo";
-import { useReducedMotion } from "@/components/landing/useReducedMotion";
+import { useCountUp } from "@/lib/hooks/useCountUp";
+import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
 
 const SUB_SCORES = [
   { label: "Opening", value: 82 },

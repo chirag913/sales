@@ -53,6 +53,11 @@ export function TrainingSetup() {
   const [callTranscript, setCallTranscript] = useState<TranscriptEntry[] | null>(null);
   const [scoring, setScoring] = useState(false);
   const [scoringError, setScoringError] = useState<string | null>(null);
+  const [scoreProgress, setScoreProgress] = useState<{
+    previousBestScore?: number;
+    previousScore?: number;
+    callNumber?: number;
+  }>({});
   const [loaded, setLoaded] = useState(false);
 
   async function refreshEntitlement(): Promise<EntitlementStatus | null> {
@@ -192,6 +197,7 @@ export function TrainingSetup() {
     setScoring(true);
     setScoringError(null);
     setScoreResult(null);
+    setScoreProgress({});
     try {
       const res = await fetch("/api/score/generate", {
         method: "POST",
@@ -210,6 +216,27 @@ export function TrainingSetup() {
       }
       const result: CallScoreResult = await res.json();
       setScoreResult(result);
+
+      // Gamification context for the score screen — the user's own past
+      // scores, read-only, fetched before this call's own row is saved below
+      // so it's naturally excluded. Non-critical: fails silently.
+      if (userId) {
+        try {
+          const { data: priorCalls } = await supabase
+            .from("calls")
+            .select("overall_score")
+            .order("created_at", { ascending: false })
+            .limit(20);
+          const scores = (priorCalls ?? []).map((c) => c.overall_score as number);
+          setScoreProgress(
+            scores.length > 0
+              ? { previousBestScore: Math.max(...scores), previousScore: scores[0], callNumber: scores.length + 1 }
+              : { callNumber: 1 }
+          );
+        } catch {
+          setScoreProgress({});
+        }
+      }
 
       if (prospectIdentity) {
         void fetch("/api/calls/save", {
@@ -301,15 +328,19 @@ export function TrainingSetup() {
     );
   }
 
-  if (step === "scoring" && selectedScenario) {
+  if (step === "scoring" && selectedScenario && prospectIdentity) {
     return (
       <ScoreScreen
         scenario={selectedScenario}
+        identity={prospectIdentity}
         durationSeconds={callDurationSeconds}
         result={scoreResult}
         loading={scoring}
         error={scoringError}
         transcript={callTranscript}
+        previousBestScore={scoreProgress.previousBestScore}
+        previousScore={scoreProgress.previousScore}
+        callNumber={scoreProgress.callNumber}
         onPracticeAgain={() => void handlePracticeAgain()}
         onDone={handleScoreDone}
       />

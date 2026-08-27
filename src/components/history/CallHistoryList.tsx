@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { CallResultDetail } from "@/components/call/CallResultDetail";
 import { Chip } from "@/components/ui/Chip";
 import { PRIMARY_LINK_CLASSES } from "@/components/ui/linkButtonClasses";
+import { ProspectAvatar } from "@/components/ui/ProspectAvatar";
 import { CallHistoryEntry } from "@/lib/history/types";
 import { CallScoreResult } from "@/lib/types";
 
@@ -72,27 +74,33 @@ export function CallHistoryList({ calls }: { calls: CallHistoryEntry[] }) {
                 onClick={() => setExpandedId(isOpen ? null : call.id)}
                 className="flex w-full flex-col gap-2 p-5 text-left sm:flex-row sm:items-center sm:justify-between"
               >
-                <div>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-                    {call.scenario.icon} {call.scenario.name}{" "}
-                    <span className="font-normal text-zinc-500 dark:text-zinc-400">
-                      vs {call.identity.fullName}, {call.identity.title}
-                    </span>
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                    {formatCallDate(call.created_at)} · {formatDuration(call.duration_seconds)}
-                  </p>
-                  {call.objection_tags.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {call.objection_tags.map((tag) => (
-                        <Chip key={tag}>{tag}</Chip>
-                      ))}
-                    </div>
-                  )}
+                <div className="flex items-center gap-3">
+                  <ProspectAvatar identity={call.identity} size="sm" />
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                      {call.scenario.icon} {call.scenario.name}{" "}
+                      <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                        vs {call.identity.fullName}, {call.identity.title}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+                      {formatCallDate(call.created_at)} · {formatDuration(call.duration_seconds)}
+                    </p>
+                    {call.objection_tags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {call.objection_tags.map((tag) => (
+                          <Chip key={tag}>{tag}</Chip>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3 self-end sm:self-auto">
                   <span className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{call.overall_score}</span>
-                  <span className="text-xs text-zinc-400 dark:text-zinc-500">{isOpen ? "Hide ▲" : "Details ▼"}</span>
+                  <span className="flex items-center gap-1 text-xs text-zinc-400 dark:text-zinc-500">
+                    {isOpen ? "Hide" : "Details"}
+                    {isOpen ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+                  </span>
                 </div>
               </button>
 

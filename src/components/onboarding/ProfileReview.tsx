@@ -2,10 +2,12 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { AlertTriangle, Building2, CheckCircle2, Flag, ShieldAlert, Target, User, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { ChipsEditor } from "@/components/ui/ChipsEditor";
+import { INPUT_CLASSES } from "@/components/ui/inputClasses";
 import { PROSPECT_MARKET_OPTIONS, SALES_OBJECTIVE_OPTIONS, TrainingProfile } from "@/lib/types";
 
 interface ProfileReviewProps {
@@ -34,9 +36,6 @@ type EditingKey =
   | "likelyObjections"
   | "salesObjective"
   | "typicalProspect";
-
-const inputClasses =
-  "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-100 dark:focus:ring-zinc-100";
 
 function EditActions({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
   return (
@@ -143,11 +142,11 @@ export function ProfileReview({
       </div>
 
       <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${refining ? "pointer-events-none opacity-60" : ""}`}>
-        <Card icon="🎯" title="Target Market" assumption={editingKey !== "market" && profile.assumptions.market}>
+        <Card icon={Target} title="Target Market" assumption={editingKey !== "market" && profile.assumptions.market}>
           {editingKey === "market" ? (
             <>
               <select
-                className={inputClasses}
+                className={INPUT_CLASSES}
                 value={draft.market ?? profile.market}
                 onChange={(e) => setDraft((d) => ({ ...d, market: e.target.value as TrainingProfile["market"] }))}
               >
@@ -170,12 +169,12 @@ export function ProfileReview({
           )}
         </Card>
 
-        <Card icon="🧰" title="Service" assumption={editingKey !== "service" && profile.assumptions.service}>
+        <Card icon={Wrench} title="Service" assumption={editingKey !== "service" && profile.assumptions.service}>
           {editingKey === "service" ? (
             <>
               <input
                 type="text"
-                className={inputClasses}
+                className={INPUT_CLASSES}
                 value={draft.service ?? profile.service}
                 onChange={(e) => setDraft((d) => ({ ...d, service: e.target.value }))}
               />
@@ -192,7 +191,7 @@ export function ProfileReview({
           )}
         </Card>
 
-        <Card icon="👤" title="Recommended ICP" assumption={editingKey !== "icpTitles" && profile.assumptions.icpTitles}>
+        <Card icon={User} title="Recommended ICP" assumption={editingKey !== "icpTitles" && profile.assumptions.icpTitles}>
           {editingKey === "icpTitles" ? (
             <>
               <ChipsEditor
@@ -217,12 +216,12 @@ export function ProfileReview({
           )}
         </Card>
 
-        <Card icon="🏢" title="Company Size" assumption={editingKey !== "companySize" && profile.assumptions.companySizeRange}>
+        <Card icon={Building2} title="Company Size" assumption={editingKey !== "companySize" && profile.assumptions.companySizeRange}>
           {editingKey === "companySize" ? (
             <>
               <input
                 type="text"
-                className={inputClasses}
+                className={INPUT_CLASSES}
                 value={draft.companySizeRange ?? profile.companySizeRange}
                 onChange={(e) => setDraft((d) => ({ ...d, companySizeRange: e.target.value }))}
                 placeholder="e.g. 10-100 employees"
@@ -269,7 +268,7 @@ export function ProfileReview({
           )}
         </Card>
 
-        <Card icon="⚠️" title="Likely Pain Points" assumption={editingKey !== "painPoints" && profile.assumptions.painPoints}>
+        <Card icon={AlertTriangle} title="Likely Pain Points" assumption={editingKey !== "painPoints" && profile.assumptions.painPoints}>
           {editingKey === "painPoints" ? (
             <>
               <ChipsEditor
@@ -295,7 +294,7 @@ export function ProfileReview({
         </Card>
 
         <Card
-          icon="🛑"
+          icon={ShieldAlert}
           title="Likely Objections"
           assumption={editingKey !== "likelyObjections" && profile.assumptions.likelyObjections}
         >
@@ -325,11 +324,11 @@ export function ProfileReview({
           )}
         </Card>
 
-        <Card icon="🏁" title="Sales Objective" assumption={editingKey !== "salesObjective" && profile.assumptions.salesObjective}>
+        <Card icon={Flag} title="Sales Objective" assumption={editingKey !== "salesObjective" && profile.assumptions.salesObjective}>
           {editingKey === "salesObjective" ? (
             <>
               <select
-                className={inputClasses}
+                className={INPUT_CLASSES}
                 value={draft.salesObjective ?? profile.salesObjective}
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, salesObjective: e.target.value as TrainingProfile["salesObjective"] }))
@@ -343,7 +342,7 @@ export function ProfileReview({
               </select>
               <input
                 type="text"
-                className={`${inputClasses} mt-3`}
+                className={`${INPUT_CLASSES} mt-3`}
                 value={draft.salesObjectiveDetail ?? profile.salesObjectiveDetail}
                 onChange={(e) => setDraft((d) => ({ ...d, salesObjectiveDetail: e.target.value }))}
                 placeholder="e.g. Book an onsite walkthrough / estimate"
@@ -378,14 +377,14 @@ export function ProfileReview({
         </Card>
 
         <Card
-          icon="🧑‍💼"
+          icon={User}
           title="Typical Prospect"
           assumption={editingKey !== "typicalProspect" && profile.assumptions.typicalProspect}
         >
           {editingKey === "typicalProspect" ? (
             <>
               <textarea
-                className={`${inputClasses} min-h-[80px] resize-y`}
+                className={`${INPUT_CLASSES} min-h-[80px] resize-y`}
                 value={draft.typicalProspect ?? profile.typicalProspect}
                 onChange={(e) => setDraft((d) => ({ ...d, typicalProspect: e.target.value }))}
               />
@@ -414,7 +413,7 @@ export function ProfileReview({
             value={refineInput}
             onChange={(e) => setRefineInput(e.target.value)}
             placeholder="e.g. Focus on Texas and target property managers."
-            className={inputClasses}
+            className={INPUT_CLASSES}
             disabled={refining}
           />
           <Button type="submit" disabled={!refineInput.trim() || refining} className="shrink-0">
@@ -426,8 +425,15 @@ export function ProfileReview({
 
       <div className="mt-10 flex flex-col items-center gap-4 text-center">
         <p className="text-lg font-medium text-zinc-900 dark:text-zinc-50">Your training environment is ready.</p>
-        <Button onClick={onConfirm} disabled={confirming} className="px-6 py-3 text-base">
-          {confirming ? "Building scenarios…" : "✓ Looks Good — Start Training"}
+        <Button onClick={onConfirm} disabled={confirming} className="gap-2 px-6 py-3 text-base">
+          {confirming ? (
+            "Building scenarios…"
+          ) : (
+            <>
+              <CheckCircle2 className="h-4 w-4" aria-hidden />
+              Looks Good — Start Training
+            </>
+          )}
         </Button>
         {confirmError && <p className="text-sm text-red-600 dark:text-red-400">{confirmError}</p>}
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { Dice5 } from "lucide-react";
 import { Chip } from "@/components/ui/Chip";
 import { ProspectGenderPreference } from "@/lib/prospect/identity";
 import { Scenario } from "@/lib/types";
@@ -99,9 +100,7 @@ export function ScenarioPicker({
           onClick={handleRandomSelect}
           className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-zinc-300 bg-transparent p-5 text-center text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
         >
-          <span className="text-2xl" aria-hidden>
-            🎲
-          </span>
+          <Dice5 className="h-6 w-6" aria-hidden />
           <span className="text-base font-semibold">Random</span>
           <span className="text-sm">Let it pick your challenge</span>
         </button>

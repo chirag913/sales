@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown, ChevronUp, Trophy } from "lucide-react";
 import { Chip } from "@/components/ui/Chip";
-import { CallScoreResult, Scenario, TranscriptEntry } from "@/lib/types";
+import { ProspectAvatar } from "@/components/ui/ProspectAvatar";
+import { ScoreGauge } from "@/components/ui/ScoreGauge";
+import { CallScoreResult, ProspectIdentity, Scenario, TranscriptEntry } from "@/lib/types";
 
 interface CallResultDetailProps {
   scenario: Pick<Scenario, "icon" | "name">;
@@ -10,6 +13,10 @@ interface CallResultDetailProps {
   result: CallScoreResult;
   transcript: TranscriptEntry[] | null;
   objectionTags?: string[];
+  identity?: ProspectIdentity;
+  previousBestScore?: number;
+  previousScore?: number;
+  callNumber?: number;
 }
 
 export function formatCallDuration(seconds: number): string {
@@ -27,21 +34,81 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function categoryBarColor(score: number): string {
+  if (score >= 8) return "bg-emerald-500";
+  if (score >= 6) return "bg-amber-500";
+  return "bg-red-500";
+}
+
 // The shared score/debrief rendering used both right after a call
 // (ScoreScreen) and when reviewing a past call (call history) — same data
 // shape (calls.categories/metrics/... map directly onto CallScoreResult),
-// so this is the one place that renders it.
-export function CallResultDetail({ scenario, durationSeconds, result, transcript, objectionTags }: CallResultDetailProps) {
+// so this is the one place that renders it. previousBestScore/previousScore/
+// callNumber are optional — only the fresh post-call ScoreScreen passes
+// them, since "vs last call" only makes sense right after a call, not when
+// reviewing history.
+export function CallResultDetail({
+  scenario,
+  durationSeconds,
+  result,
+  transcript,
+  objectionTags,
+  identity,
+  previousBestScore,
+  previousScore,
+  callNumber,
+}: CallResultDetailProps) {
   const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const isNewBest = previousBestScore !== undefined && result.overallScore > previousBestScore;
+  const delta = previousScore !== undefined ? result.overallScore - previousScore : null;
 
   return (
     <div>
-      <div className="mb-8 text-center">
+      <div className="mb-8 flex flex-col items-center text-center">
+        {identity && (
+          <div className="mb-4 flex items-center gap-3">
+            <ProspectAvatar identity={identity} size="sm" />
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              {identity.fullName} · {identity.title}
+            </p>
+          </div>
+        )}
         <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
           {scenario.icon} {scenario.name} · {formatCallDuration(durationSeconds)}
         </p>
-        <p className="mt-2 text-6xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{result.overallScore}</p>
-        <p className="text-sm text-zinc-400 dark:text-zinc-500">out of 100</p>
+        <div className="mt-4">
+          <ScoreGauge value={result.overallScore} />
+        </div>
+
+        {(isNewBest || delta !== null || callNumber !== undefined) && (
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {isNewBest && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <Trophy className="h-3.5 w-3.5" aria-hidden />
+                New personal best
+              </span>
+            )}
+            {!isNewBest && delta !== null && delta !== 0 && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
+                  delta > 0
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400"
+                }`}
+              >
+                {delta > 0 ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+                {delta > 0 ? "+" : ""}
+                {delta} vs last call
+              </span>
+            )}
+            {callNumber !== undefined && (
+              <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
+                Call #{callNumber}
+              </span>
+            )}
+          </div>
+        )}
+
         {objectionTags && objectionTags.length > 0 && (
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             {objectionTags.map((tag) => (
@@ -61,7 +128,13 @@ export function CallResultDetail({ scenario, durationSeconds, result, transcript
               <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{cat.name}</p>
               <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">{cat.score}/10</p>
             </div>
-            <p className="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">{cat.reason}</p>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-900">
+              <div
+                className={`h-full rounded-full ${categoryBarColor(cat.score)}`}
+                style={{ width: `${cat.score * 10}%` }}
+              />
+            </div>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{cat.reason}</p>
             <p className="mt-1.5 text-xs text-zinc-400 dark:text-zinc-500">Better: {cat.betterApproach}</p>
           </div>
         ))}
@@ -128,7 +201,10 @@ export function CallResultDetail({ scenario, durationSeconds, result, transcript
             className="flex w-full items-center justify-between rounded-2xl border border-zinc-200/70 bg-white px-5 py-3 text-left dark:border-zinc-800 dark:bg-zinc-950"
           >
             <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">View full transcript</span>
-            <span className="text-xs text-zinc-400 dark:text-zinc-500">{transcriptOpen ? "Hide ▲" : "Show ▼"}</span>
+            <span className="flex items-center gap-1 text-xs text-zinc-400 dark:text-zinc-500">
+              {transcriptOpen ? "Hide" : "Show"}
+              {transcriptOpen ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+            </span>
           </button>
 
           {transcriptOpen && (
