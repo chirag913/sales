@@ -11,7 +11,16 @@ import { CREDIT_PACK_CALLS, CREDIT_PACK_PRICE_INR, TRIAL_CALL_MINUTES } from "@/
 import { READINESS_MIN_AVG_SCORE, READINESS_MIN_CALLS } from "@/lib/config/readiness";
 import { MyTeamResponse, TeamMemberAnalytics } from "@/lib/team/types";
 
-const QUANTITY_OPTIONS = Array.from({ length: 20 }, (_, i) => ({ value: String(i + 1), label: `${i + 1} pack${i === 0 ? "" : "s"}` }));
+// Framed around rough team size, not raw pack count — an agency owner
+// thinks "how many people," not "how many 40-call packs." Illustrative
+// people-estimates only; no per-person threshold exists elsewhere in this
+// codebase to line these up against (checked before writing these).
+const QUANTITY_PRESETS = [
+  { quantity: 1, label: "Small team", sublabel: "~1-2 people" },
+  { quantity: 3, label: "Growing team", sublabel: "~4-6 people" },
+  { quantity: 5, label: "Full team", sublabel: "~8-10 people" },
+  { quantity: 10, label: "Large team", sublabel: "~15-20 people" },
+];
 
 async function fetchMyTeam(): Promise<MyTeamResponse | null> {
   try {
@@ -283,9 +292,20 @@ function TeamActivitySection({ analytics }: { analytics: TeamMemberAnalytics[] |
 
 function BuyTeamCreditsControl({ teamId, onPurchased }: { teamId: string; onPurchased: () => void }) {
   const [quantity, setQuantity] = useState(1);
+  // Which chip reads as selected — deliberately its own flag rather than
+  // inferring "custom" from quantity not matching a preset: if the owner
+  // opens the stepper and dials it to a number that happens to match a
+  // preset (e.g. lands back on 5), the explicitly-chosen "Custom amount"
+  // chip should stay selected, not silently swap back to "Full team".
+  const [customMode, setCustomMode] = useState(false);
   const totalCalls = CREDIT_PACK_CALLS * quantity;
   const totalPrice = CREDIT_PACK_PRICE_INR * quantity;
   const totalMinutes = totalCalls * TRIAL_CALL_MINUTES;
+
+  function setBoundedQuantity(next: number) {
+    if (!Number.isFinite(next)) return;
+    setQuantity(Math.min(20, Math.max(1, Math.round(next))));
+  }
 
   function handlePurchased() {
     // The owner is also an active member of their own team, so their own
@@ -298,20 +318,63 @@ function BuyTeamCreditsControl({ teamId, onPurchased }: { teamId: string; onPurc
   return (
     <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
       <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Buy credits for your team</p>
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <div className="w-32">
-          <FormField
-            label="Packs"
-            type="select"
-            value={String(quantity)}
-            onChange={(v) => setQuantity(Number(v))}
-            options={QUANTITY_OPTIONS}
-          />
-        </div>
-        <p className="pb-2 text-sm text-zinc-500 dark:text-zinc-400">
-          {totalCalls} calls · up to {totalMinutes} min · ₹{totalPrice}
-        </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {QUANTITY_PRESETS.map((preset) => (
+          <Chip
+            key={preset.quantity}
+            selected={!customMode && quantity === preset.quantity}
+            onClick={() => {
+              setQuantity(preset.quantity);
+              setCustomMode(false);
+            }}
+          >
+            <span className="flex flex-col items-start leading-tight">
+              <span>{preset.label}</span>
+              <span className="text-[10px] opacity-70">{preset.sublabel}</span>
+            </span>
+          </Chip>
+        ))}
+        <Chip selected={customMode} onClick={() => setCustomMode(true)}>
+          Custom amount
+        </Chip>
       </div>
+
+      {customMode && (
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setBoundedQuantity(quantity - 1)}
+            disabled={quantity <= 1}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            aria-label="Fewer packs"
+          >
+            −
+          </button>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={quantity}
+            onChange={(e) => setBoundedQuantity(Number(e.target.value))}
+            className="w-14 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-center text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+          />
+          <button
+            type="button"
+            onClick={() => setBoundedQuantity(quantity + 1)}
+            disabled={quantity >= 20}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            aria-label="More packs"
+          >
+            +
+          </button>
+          <span className="text-xs text-zinc-400 dark:text-zinc-500">packs (1-20)</span>
+        </div>
+      )}
+
+      <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+        {totalCalls} calls · up to {totalMinutes} min · ₹{totalPrice}
+      </p>
+
       <div className="mt-3">
         <BuyCreditsButton
           quantity={quantity}
