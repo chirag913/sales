@@ -42,13 +42,60 @@ function isReady(a: TeamMemberAnalytics): boolean {
   return a.totalCalls >= READINESS_MIN_CALLS && (a.avgOverallScore ?? 0) >= READINESS_MIN_AVG_SCORE;
 }
 
+// Shared inline two-step confirm — no Dialog/Modal primitive exists
+// anywhere in this codebase, so this stays an inline expansion rather than
+// introducing one just for a handful of call sites. Two tones: "warning"
+// for a heads-up that isn't actually destructive (creating a team is
+// reversible — leave it and personal credits are active again), "danger"
+// for something genuinely irreversible (delete team, leave team), matching
+// the Chip component's own tone prop for the same neutral-vs-positive
+// distinction elsewhere in this file.
+function InlineConfirm({
+  tone,
+  message,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+  loading,
+  error,
+}: {
+  tone: "warning" | "danger";
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+  error: string | null;
+}) {
+  const boxClasses =
+    tone === "danger"
+      ? "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/30"
+      : "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30";
+  const textClasses = tone === "danger" ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-300";
+
+  return (
+    <div className={`mt-3 rounded-xl border p-4 ${boxClasses}`}>
+      <p className={`text-sm ${textClasses}`}>{message}</p>
+      <div className="mt-3 flex gap-3">
+        <Button variant="secondary" onClick={onCancel} disabled={loading}>
+          Cancel
+        </Button>
+        <Button variant={tone === "danger" ? "danger" : "primary"} onClick={onConfirm} disabled={loading}>
+          {loading ? "Working…" : confirmLabel}
+        </Button>
+      </div>
+      {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
+    </div>
+  );
+}
+
 function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleCreate() {
-    if (!name.trim()) return;
     setError(null);
     setLoading(true);
     try {
@@ -71,6 +118,7 @@ function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
+      setConfirming(false); // back to the plain form, not stuck behind the confirm box
     } finally {
       setLoading(false);
     }
@@ -81,13 +129,28 @@ function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
       title="Create a team"
       description="Pool credits across your team and see who's practicing. You'll be the team owner."
     >
-      <FormField label="Team name" value={name} onChange={setName} placeholder="Acme Sales Agency" />
+      <FormField label="Team name" value={name} onChange={setName} placeholder="Acme Sales Agency" disabled={confirming} />
       <div className="flex items-end">
-        <Button onClick={() => void handleCreate()} disabled={loading || !name.trim()}>
-          {loading ? "Creating…" : "Create team"}
-        </Button>
+        {!confirming && (
+          <Button onClick={() => setConfirming(true)} disabled={!name.trim()}>
+            Create team
+          </Button>
+        )}
       </div>
-      {error && <p className="text-sm text-red-600 dark:text-red-400 sm:col-span-2">{error}</p>}
+      {confirming && (
+        <div className="sm:col-span-2">
+          <InlineConfirm
+            tone="warning"
+            message="Creating a team switches you to a shared team pool. Your personal credits become inactive while you're on a team — they aren't lost, just not used until you leave. Continue?"
+            confirmLabel="Yes, create team"
+            onConfirm={() => void handleCreate()}
+            onCancel={() => setConfirming(false)}
+            loading={loading}
+            error={error}
+          />
+        </div>
+      )}
+      {!confirming && error && <p className="text-sm text-red-600 dark:text-red-400 sm:col-span-2">{error}</p>}
     </FormSection>
   );
 }
@@ -261,6 +324,57 @@ function BuyTeamCreditsControl({ teamId, onPurchased }: { teamId: string; onPurc
   );
 }
 
+function DeleteTeamControl({ team, onDeleted }: { team: Extract<MyTeamResponse, { role: "owner" }>; onDeleted: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const memberCount = team.members.filter((m) => m.role !== "owner").length;
+
+  async function handleDelete() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/teams/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId: team.teamId }),
+      });
+      if (!res.ok) throw new Error("Failed to delete team.");
+      // Deleting refunds the pool to the owner's own personal balance and
+      // ends their team membership — both change what the nav badge should
+      // show (AuthenticatedShell), same reason other team mutations here do
+      // this.
+      window.dispatchEvent(new Event("team-entitlement-changed"));
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="mt-6 border-t border-zinc-100 pt-6 dark:border-zinc-900">
+      <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Danger zone</p>
+      {!confirming ? (
+        <Button variant="danger" className="mt-3" onClick={() => setConfirming(true)}>
+          Delete team
+        </Button>
+      ) : (
+        <InlineConfirm
+          tone="danger"
+          message={`This removes all ${memberCount} member${memberCount === 1 ? "" : "s"} from the team and refunds ${team.creditsBalance} remaining credit${team.creditsBalance === 1 ? "" : "s"} to your personal balance. This cannot be undone.`}
+          confirmLabel="Yes, delete team"
+          onConfirm={() => void handleDelete()}
+          onCancel={() => setConfirming(false)}
+          loading={loading}
+          error={error}
+        />
+      )}
+    </div>
+  );
+}
+
 function OwnerView({
   team,
   analytics,
@@ -342,19 +456,77 @@ function OwnerView({
         )}
 
         <InviteForm teamId={team.teamId} onInvited={onRefresh} />
+
+        <DeleteTeamControl team={team} onDeleted={onRefresh} />
       </div>
     </FormSection>
   );
 }
 
-function MemberView({ team }: { team: Extract<MyTeamResponse, { role: "member" }> }) {
+function LeaveTeamControl({ onLeft }: { onLeft: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleLeave() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/teams/leave", { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.message ?? "Failed to leave team.");
+      }
+      // Leaving switches this user back to their own personal credits —
+      // changes what the nav badge should show (AuthenticatedShell), same
+      // reason other team mutations here do this.
+      window.dispatchEvent(new Event("team-entitlement-changed"));
+      onLeft();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!confirming) {
+    return (
+      <Button variant="danger" onClick={() => setConfirming(true)}>
+        Leave team
+      </Button>
+    );
+  }
+
+  return (
+    <InlineConfirm
+      tone="danger"
+      message="You'll switch back to your own personal credits. This cannot be undone."
+      confirmLabel="Yes, leave team"
+      onConfirm={() => void handleLeave()}
+      onCancel={() => setConfirming(false)}
+      loading={loading}
+      error={error}
+    />
+  );
+}
+
+function MemberView({
+  team,
+  onLeft,
+}: {
+  team: Extract<MyTeamResponse, { role: "member" }>;
+  onLeft: () => void;
+}) {
   return (
     <FormSection title={team.teamName} description="You're a member of this team.">
-      <div className="flex items-center gap-2 sm:col-span-2">
-        <Chip>{team.status}</Chip>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Your practice calls draw from this team&apos;s shared credit pool.
-        </p>
+      <div className="flex flex-col gap-4 sm:col-span-2">
+        <div className="flex items-center gap-2">
+          <Chip>{team.status}</Chip>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Your practice calls draw from this team&apos;s shared credit pool.
+          </p>
+        </div>
+        <LeaveTeamControl onLeft={onLeft} />
       </div>
     </FormSection>
   );
@@ -388,6 +560,6 @@ export function TeamSection() {
   if (loading || !team) return null;
 
   if (team.role === "owner") return <OwnerView team={team} analytics={analytics} onRefresh={refresh} />;
-  if (team.role === "member") return <MemberView team={team} />;
+  if (team.role === "member") return <MemberView team={team} onLeft={refresh} />;
   return <CreateTeamForm onCreated={refresh} />;
 }

@@ -1,7 +1,7 @@
 import { ButtonHTMLAttributes } from "react";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "danger";
 }
 
 const variants = {
@@ -9,6 +9,10 @@ const variants = {
     "bg-zinc-900 text-white shadow-sm hover:bg-zinc-700 hover:-translate-y-px active:translate-y-0 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200",
   secondary:
     "border border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:-translate-y-px active:translate-y-0 dark:border-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:bg-zinc-900",
+  // For an action that's actually destructive/irreversible (delete team,
+  // leave team) — pair with an inline confirm step, not a substitute for one.
+  danger:
+    "bg-red-600 text-white shadow-sm hover:bg-red-700 hover:-translate-y-px active:translate-y-0 dark:bg-red-600 dark:hover:bg-red-500",
 };
 
 export function Button({ variant = "primary", className = "", ...props }: ButtonProps) {
