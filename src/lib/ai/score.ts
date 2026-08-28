@@ -37,7 +37,12 @@ Rules:
   offices, or guarantees that aren't listed. If the caller's info doesn't cover something the
   prospect asked about, the better response should be a truthful answer, not a fabricated one.
 - If the call was very short, score honestly — a low score with a clear reason like "call ended
-  before discovery could happen" is valid and expected, not something to avoid.`;
+  before discovery could happen" is valid and expected, not something to avoid.
+- Avoid repeating yourself across fields: category reasons, biggestMistake, and betterResponses are
+  shown together, so keep them complementary rather than restating the same point in different
+  words. Each should reference a different specific moment from the call wherever possible. If the
+  call really only has one significant issue, let biggestMistake cover it thoroughly and have
+  betterResponses focus on other, smaller moments rather than re-describing the same issue again.`;
 
 const scoreSchema = {
   type: "object",

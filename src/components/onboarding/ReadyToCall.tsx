@@ -1,6 +1,7 @@
 "use client";
 
-import { Headphones, Mic, Volume1 } from "lucide-react";
+import Link from "next/link";
+import { Headphones, Mic, ShieldCheck, Volume1 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ProspectAvatar } from "@/components/ui/ProspectAvatar";
 import { ProspectIdentity, Scenario, TrainingProfile } from "@/lib/types";
@@ -79,6 +80,19 @@ export function ReadyToCall({ profile, scenario, identity, onBack, onStartCall }
           <li className="flex items-start gap-2.5">
             <Mic className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400 dark:text-zinc-500" aria-hidden />
             Turn on your OS&apos;s voice isolation / noise suppression if it has one
+          </li>
+          <li className="flex items-start gap-2.5">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400 dark:text-zinc-500" aria-hidden />
+            <span>
+              <Link
+                href="/privacy"
+                className="underline underline-offset-4 hover:text-zinc-700 dark:hover:text-zinc-300"
+              >
+                Private practice
+              </Link>{" "}
+              — your practice calls are private and aren&apos;t shared with other users. Your calls are used to
+              generate your transcript, coaching, and score.
+            </span>
           </li>
         </ul>
       </div>
