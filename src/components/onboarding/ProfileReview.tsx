@@ -20,7 +20,7 @@ import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { ChipsEditor } from "@/components/ui/ChipsEditor";
 import { INPUT_CLASSES } from "@/components/ui/inputClasses";
-import { CALL_TYPE_OPTIONS, PROSPECT_MARKET_OPTIONS, SALES_OBJECTIVE_OPTIONS, TrainingProfile } from "@/lib/types";
+import { CALL_TYPE_OPTIONS, CallType, PROSPECT_MARKET_OPTIONS, SALES_OBJECTIVE_OPTIONS, TrainingProfile } from "@/lib/types";
 
 interface ProfileReviewProps {
   profile: TrainingProfile;
@@ -37,6 +37,17 @@ const MARKET_LABEL: Record<string, string> = {
   Canada: "🇨🇦 Canada",
   Australia: "🇦🇺 Australia",
   Other: "🌍 Other",
+};
+
+// Literal cold-to-warm scale (sky -> amber -> orange), not emerald — see
+// Chip.tsx's tone comment for why: emerald already means "success" via
+// CallResultDetail's best-moment card and readiness badges elsewhere, and
+// a warm call hasn't succeeded at anything yet, it's just a different
+// starting point.
+const CALL_TYPE_TONE: Record<CallType, { chip: "cold" | "lukewarm" | "warm"; border: string }> = {
+  cold: { chip: "cold", border: "border-sky-200 dark:border-sky-900/50" },
+  cold_after_outreach: { chip: "lukewarm", border: "border-amber-200 dark:border-amber-900/50" },
+  warm: { chip: "warm", border: "border-orange-200 dark:border-orange-900/50" },
 };
 
 type EditingKey =
@@ -146,12 +157,17 @@ export function ProfileReview({
     setDraft({});
   }
 
-  // Rendered once, placed into whichever tier matches its CURRENT (saved)
-  // value — never both. Deliberately keyed off profile.callType, not draft,
-  // so the card doesn't relocate itself out from under the user mid-edit;
-  // it only moves tiers after a Save commits a new value.
+  // Always visible (never conditional, never in the collapsed tier) — this
+  // card does double duty (the call type +, for the two non-cold values,
+  // the real context behind it), which is exactly why it gets a
+  // temperature-matched accent border on top of the badge below.
   const callTypeCard = (
-    <Card icon={PhoneCall} title="Call Type" assumption={editingKey !== "callType" && profile.assumptions.callType}>
+    <Card
+      icon={PhoneCall}
+      title="Call Type"
+      assumption={editingKey !== "callType" && profile.assumptions.callType}
+      borderClassName={CALL_TYPE_TONE[profile.callType]?.border}
+    >
       {editingKey === "callType" ? (
         <>
           <div className="flex flex-wrap gap-2">
@@ -193,11 +209,11 @@ export function ProfileReview({
         </>
       ) : (
         <>
-          <p className="text-lg text-zinc-900 dark:text-zinc-50">
+          <Chip tone={CALL_TYPE_TONE[profile.callType]?.chip ?? "cold"}>
             {CALL_TYPE_OPTIONS.find((o) => o.value === profile.callType)?.label ?? "Cold call"}
-          </p>
+          </Chip>
           {profile.callType !== "cold" && profile.priorContextDetail && (
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{profile.priorContextDetail}</p>
+            <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">{profile.priorContextDetail}</p>
           )}
           <EditButton
             onClick={() => startEdit("callType", { callType: profile.callType, priorContextDetail: profile.priorContextDetail })}
@@ -217,6 +233,8 @@ export function ProfileReview({
       </div>
 
       <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${refining ? "pointer-events-none opacity-60" : ""}`}>
+        {callTypeCard}
+
         <Card icon={Wrench} title="Service" assumption={editingKey !== "service" && profile.assumptions.service}>
           {editingKey === "service" ? (
             <>
@@ -315,8 +333,6 @@ export function ProfileReview({
             </>
           )}
         </Card>
-
-        {profile.callType !== "cold" && callTypeCard}
       </div>
 
       <div className="mt-4">
@@ -493,8 +509,6 @@ export function ProfileReview({
                 </>
               )}
             </Card>
-
-            {profile.callType === "cold" && callTypeCard}
           </div>
         )}
       </div>
