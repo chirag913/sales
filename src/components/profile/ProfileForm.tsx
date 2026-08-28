@@ -135,7 +135,7 @@ export function ProfileForm() {
           value={profile.targetCustomer.jobTitle}
           onChange={(v) => update("targetCustomer", "jobTitle", v)}
           disabled
-          hint="Read-only — synced from your Recommended ICP. Edit it on the training setup screen's ICP card, not here."
+          hint="Read-only — synced from the Who You're Calling card on the training setup screen. Edit it there, not here."
         />
         <FormField
           label="Country"

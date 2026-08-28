@@ -3,7 +3,7 @@ import { RevealOnScroll } from "@/components/landing/RevealOnScroll";
 const STEPS = [
   {
     number: "01",
-    label: "Set your ICP",
+    label: "Tell us who you're calling",
     description: "Tell BetterCallz who you sell to and what you're selling.",
   },
   {

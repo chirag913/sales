@@ -13,7 +13,7 @@ export function Hero() {
           Practice cold calls on an AI that argues back — before you call a real lead
         </h1>
         <p className="mt-6 text-lg text-zinc-500 dark:text-zinc-400">
-          Set your ICP, call a realistic AI prospect, and get coached on exactly what to fix.
+          Tell us who you&apos;re calling, then talk to a realistic AI prospect and get coached on exactly what to fix.
         </p>
         <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
           <Link href="/practice" className={`${PRIMARY_LINK_CLASSES} group px-6 py-3 text-base`}>

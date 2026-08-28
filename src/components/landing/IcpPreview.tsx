@@ -25,7 +25,9 @@ export function IcpPreview() {
   return (
     <section className="mx-auto max-w-4xl px-6 py-24 sm:py-32">
       <div className="text-center">
-        <p className="font-mono text-xs font-medium tracking-widest text-emerald-600 dark:text-emerald-400">ICP</p>
+        <p className="font-mono text-xs font-medium tracking-widest text-emerald-600 dark:text-emerald-400">
+          WHO YOU&apos;RE CALLING
+        </p>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
           Practice against the prospects you actually sell to
         </h2>

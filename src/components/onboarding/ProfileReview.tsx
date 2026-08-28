@@ -243,7 +243,7 @@ export function ProfileReview({
           )}
         </Card>
 
-        <Card icon={User} title="Recommended ICP" assumption={editingKey !== "icpTitles" && profile.assumptions.icpTitles}>
+        <Card icon={User} title="Who You're Calling" assumption={editingKey !== "icpTitles" && profile.assumptions.icpTitles}>
           {editingKey === "icpTitles" ? (
             <>
               <ChipsEditor
