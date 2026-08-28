@@ -42,7 +42,13 @@ Rules:
   shown together, so keep them complementary rather than restating the same point in different
   words. Each should reference a different specific moment from the call wherever possible. If the
   call really only has one significant issue, let biggestMistake cover it thoroughly and have
-  betterResponses focus on other, smaller moments rather than re-describing the same issue again.`;
+  betterResponses focus on other, smaller moments rather than re-describing the same issue again.
+- The call type (cold or warm) is given below. On a cold call, if the caller claimed prior contact
+  that didn't exist (e.g. "we spoke before," "you scheduled this") and the transcript shows the
+  prospect correctly denying it, score that as a real mistake — reflect it in the relevant
+  category's reason (Opening or Credibility are usually the right fit) and biggestMistake if it's
+  the most important issue, not as a neutral or unavoidable stumble. On a warm call, the caller
+  accurately referencing the real prior context is expected and correct — never penalize it.`;
 
 const scoreSchema = {
   type: "object",
@@ -133,8 +139,15 @@ export async function generateCallScore({
     .map((entry) => `${entry.role === "user" ? "Caller" : "Prospect"}: ${entry.text}`)
     .join("\n");
 
+  const callType = trainingProfile.callType ?? "cold";
+  const callTypeLine =
+    callType === "warm"
+      ? `Call type: warm — the caller has real prior context with this prospect: ${trainingProfile.priorContextDetail}`
+      : `Call type: cold — this is first contact; the prospect has never spoken to this caller before.`;
+
   const userMessage = `Scenario: ${scenario.name} (${scenario.difficulty}) — ${scenario.description}
 Call objective: ${scenario.objective}
+${callTypeLine}
 
 Caller's offer:
 ${offerLines.map((l) => `- ${l}`).join("\n")}

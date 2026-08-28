@@ -25,7 +25,12 @@ Rules:
   existing-provider objection, and one Expert/nightmare scenario combining multiple objections
   and interruptions.
 - Never invent proof, clients, results, or credentials — scenarios describe prospect behavior
-  only, never claims about the seller's company.`;
+  only, never claims about the seller's company.
+- The training profile includes callType ("cold" or "warm") and, when warm, priorContextDetail
+  describing real prior contact with the prospect. If callType is "warm", every scenario must
+  stay consistent with that established prior context — build on it, never invent first-contact
+  confusion or a prospect who's never heard of the caller. If callType is "cold" (the default),
+  scenarios describe a first-contact call as usual.`;
 
 const scenariosSchema = {
   type: "object",

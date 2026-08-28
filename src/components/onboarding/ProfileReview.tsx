@@ -2,13 +2,13 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Building2, CheckCircle2, Flag, ShieldAlert, Target, User, Wrench } from "lucide-react";
+import { AlertTriangle, Building2, CheckCircle2, Flag, PhoneCall, ShieldAlert, Target, User, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { ChipsEditor } from "@/components/ui/ChipsEditor";
 import { INPUT_CLASSES } from "@/components/ui/inputClasses";
-import { PROSPECT_MARKET_OPTIONS, SALES_OBJECTIVE_OPTIONS, TrainingProfile } from "@/lib/types";
+import { CALL_TYPE_OPTIONS, PROSPECT_MARKET_OPTIONS, SALES_OBJECTIVE_OPTIONS, TrainingProfile } from "@/lib/types";
 
 interface ProfileReviewProps {
   profile: TrainingProfile;
@@ -35,7 +35,8 @@ type EditingKey =
   | "painPoints"
   | "likelyObjections"
   | "salesObjective"
-  | "typicalProspect";
+  | "typicalProspect"
+  | "callType";
 
 function EditActions({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
   return (
@@ -142,6 +143,57 @@ export function ProfileReview({
       </div>
 
       <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${refining ? "pointer-events-none opacity-60" : ""}`}>
+        <Card icon={PhoneCall} title="Call Type" assumption={editingKey !== "callType" && profile.assumptions.callType}>
+          {editingKey === "callType" ? (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {CALL_TYPE_OPTIONS.map((opt) => (
+                  <Chip
+                    key={opt.value}
+                    selected={(draft.callType ?? profile.callType) === opt.value}
+                    onClick={() => setDraft((d) => ({ ...d, callType: opt.value }))}
+                  >
+                    {opt.label}
+                  </Chip>
+                ))}
+              </div>
+              {(draft.callType ?? profile.callType) === "warm" && (
+                <input
+                  type="text"
+                  className={`${INPUT_CLASSES} mt-3`}
+                  value={draft.priorContextDetail ?? profile.priorContextDetail ?? ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, priorContextDetail: e.target.value }))}
+                  placeholder="e.g. They requested a quote through your website last week."
+                />
+              )}
+              <EditActions
+                onSave={() =>
+                  saveEdit(
+                    {
+                      callType: draft.callType ?? profile.callType,
+                      priorContextDetail: draft.priorContextDetail ?? profile.priorContextDetail,
+                    },
+                    ["callType", "priorContextDetail"]
+                  )
+                }
+                onCancel={cancelEdit}
+              />
+            </>
+          ) : (
+            <>
+              <p className="text-lg text-zinc-900 dark:text-zinc-50">
+                {CALL_TYPE_OPTIONS.find((o) => o.value === profile.callType)?.label ?? "Cold call"}
+              </p>
+              {profile.callType === "warm" && profile.priorContextDetail && (
+                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{profile.priorContextDetail}</p>
+              )}
+              <EditButton
+                onClick={() => startEdit("callType", { callType: profile.callType, priorContextDetail: profile.priorContextDetail })}
+              />
+            </>
+          )}
+        </Card>
+
         <Card icon={Target} title="Target Market" assumption={editingKey !== "market" && profile.assumptions.market}>
           {editingKey === "market" ? (
             <>

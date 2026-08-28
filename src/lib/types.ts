@@ -65,6 +65,13 @@ export const PROSPECT_MARKET_OPTIONS: { value: ProspectMarket; label: string }[]
   { value: "Other", label: "Other" },
 ];
 
+export type CallType = "cold" | "warm";
+
+export const CALL_TYPE_OPTIONS: { value: CallType; label: string; description: string }[] = [
+  { value: "cold", label: "Cold call", description: "First contact — the prospect has never heard from you." },
+  { value: "warm", label: "Warm call", description: "Following up on something real — an inbound lead, a prior call, a referral." },
+];
+
 export type TrainingProfileFieldKey =
   | "market"
   | "service"
@@ -74,7 +81,9 @@ export type TrainingProfileFieldKey =
   | "painPoints"
   | "likelyObjections"
   | "salesObjective"
-  | "typicalProspect";
+  | "typicalProspect"
+  | "callType"
+  | "priorContextDetail";
 
 export interface TrainingProfile {
   market: ProspectMarket;
@@ -87,6 +96,13 @@ export interface TrainingProfile {
   salesObjective: SalesObjective;
   salesObjectiveDetail: string;
   typicalProspect: string;
+  callType: CallType;
+  // Only meaningful when callType is "warm" — a truthful, specific sentence
+  // about what actually happened before (e.g. "They filled out a contact
+  // form last week asking about pricing"), never vague ("we talked
+  // before"). See buildProspectPrompt.ts's "Your relationship with this
+  // caller" section, which is what actually uses this.
+  priorContextDetail?: string;
   assumptions: Partial<Record<TrainingProfileFieldKey, boolean>>;
 }
 

@@ -23,7 +23,14 @@ Rules:
   make_sale. salesObjectiveDetail is a short, specific natural-language description of the
   objective (e.g. "Book an onsite walkthrough / estimate").
 - additionalCriteria holds any other qualifying detail worth surfacing (e.g. facility size,
-  vertical, sub-segment) — leave it as an empty array if nothing else is relevant.`;
+  vertical, sub-segment) — leave it as an empty array if nothing else is relevant.
+- callType is "warm" only if the input mentions prior contact, an inbound lead, a referral, or
+  an existing relationship with the prospect — default to "cold" otherwise, since cold outbound
+  is this product's primary use case. When callType is "warm", priorContextDetail must be a
+  SPECIFIC, plausible, truthful sentence about what actually happened before (e.g. "They filled
+  out a contact form last week asking about pricing") — never vague ("we talked before," "you've
+  spoken"), since the prospect needs to believably remember it. When callType is "cold",
+  priorContextDetail must be an empty string.`;
 
 const trainingProfileSchema = {
   type: "object",
@@ -42,6 +49,11 @@ const trainingProfileSchema = {
     },
     salesObjectiveDetail: { type: "string" },
     typicalProspect: { type: "string" },
+    callType: { type: "string", enum: ["cold", "warm"] },
+    // Always present (OpenAI strict mode requires every property to be
+    // required) — empty string when callType is "cold", same convention as
+    // additionalCriteria being an empty array when nothing else applies.
+    priorContextDetail: { type: "string" },
     assumptions: {
       type: "object",
       additionalProperties: false,
@@ -55,6 +67,8 @@ const trainingProfileSchema = {
         likelyObjections: { type: "boolean" },
         salesObjective: { type: "boolean" },
         typicalProspect: { type: "boolean" },
+        callType: { type: "boolean" },
+        priorContextDetail: { type: "boolean" },
       },
       required: [
         "market",
@@ -66,6 +80,8 @@ const trainingProfileSchema = {
         "likelyObjections",
         "salesObjective",
         "typicalProspect",
+        "callType",
+        "priorContextDetail",
       ],
     },
   },
@@ -80,6 +96,8 @@ const trainingProfileSchema = {
     "salesObjective",
     "salesObjectiveDetail",
     "typicalProspect",
+    "callType",
+    "priorContextDetail",
     "assumptions",
   ],
 } as const;
