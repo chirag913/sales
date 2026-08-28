@@ -65,11 +65,20 @@ export const PROSPECT_MARKET_OPTIONS: { value: ProspectMarket; label: string }[]
   { value: "Other", label: "Other" },
 ];
 
-export type CallType = "cold" | "warm";
+export type CallType = "cold" | "cold_after_outreach" | "warm";
 
 export const CALL_TYPE_OPTIONS: { value: CallType; label: string; description: string }[] = [
-  { value: "cold", label: "Cold call", description: "First contact — the prospect has never heard from you." },
-  { value: "warm", label: "Warm call", description: "Following up on something real — an inbound lead, a prior call, a referral." },
+  { value: "cold", label: "Cold call", description: "First contact — they've never heard from you at all." },
+  {
+    value: "cold_after_outreach",
+    label: "Following up on an email",
+    description: "You've emailed or messaged them, but never actually spoken — no reply required.",
+  },
+  {
+    value: "warm",
+    label: "Warm call",
+    description: "A real prior connection — an inbound lead, referral, or previous conversation.",
+  },
 ];
 
 export type TrainingProfileFieldKey =
@@ -97,10 +106,12 @@ export interface TrainingProfile {
   salesObjectiveDetail: string;
   typicalProspect: string;
   callType: CallType;
-  // Only meaningful when callType is "warm" — a truthful, specific sentence
-  // about what actually happened before (e.g. "They filled out a contact
-  // form last week asking about pricing"), never vague ("we talked
-  // before"). See buildProspectPrompt.ts's "Your relationship with this
+  // Required (specific, never vague) for "cold_after_outreach" and "warm" —
+  // meaningless for pure "cold". For cold_after_outreach: describe the
+  // actual outreach sent (e.g. "You emailed them on [rough timeframe] about
+  // pricing, no reply yet"). For warm: describe the real established
+  // context (e.g. "They filled out a contact form last week asking for a
+  // quote"). See buildProspectPrompt.ts's "Your relationship with this
   // caller" section, which is what actually uses this.
   priorContextDetail?: string;
   assumptions: Partial<Record<TrainingProfileFieldKey, boolean>>;

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Headphones, Mic, ShieldCheck, Volume1 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ProspectAvatar } from "@/components/ui/ProspectAvatar";
-import { ProspectIdentity, Scenario, TrainingProfile } from "@/lib/types";
+import { CALL_TYPE_OPTIONS, ProspectIdentity, Scenario, TrainingProfile } from "@/lib/types";
 
 interface ReadyToCallProps {
   profile: TrainingProfile;
@@ -63,6 +63,14 @@ export function ReadyToCall({ profile, scenario, identity, onBack, onStartCall }
             <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Objective</dt>
             <dd className="text-zinc-900 dark:text-zinc-50">{scenario.objective}</dd>
           </div>
+          {profile.callType !== "cold" && profile.priorContextDetail && (
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                {CALL_TYPE_OPTIONS.find((o) => o.value === profile.callType)?.label ?? "Prior context"}
+              </dt>
+              <dd className="text-zinc-900 dark:text-zinc-50">{profile.priorContextDetail}</dd>
+            </div>
+          )}
         </dl>
       </div>
 

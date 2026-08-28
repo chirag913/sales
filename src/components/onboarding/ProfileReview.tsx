@@ -157,13 +157,17 @@ export function ProfileReview({
                   </Chip>
                 ))}
               </div>
-              {(draft.callType ?? profile.callType) === "warm" && (
+              {(draft.callType ?? profile.callType) !== "cold" && (
                 <input
                   type="text"
                   className={`${INPUT_CLASSES} mt-3`}
                   value={draft.priorContextDetail ?? profile.priorContextDetail ?? ""}
                   onChange={(e) => setDraft((d) => ({ ...d, priorContextDetail: e.target.value }))}
-                  placeholder="e.g. They requested a quote through your website last week."
+                  placeholder={
+                    (draft.callType ?? profile.callType) === "cold_after_outreach"
+                      ? "e.g. You emailed them last week about pricing, no reply yet."
+                      : "e.g. They requested a quote through your website last week."
+                  }
                 />
               )}
               <EditActions
@@ -184,7 +188,7 @@ export function ProfileReview({
               <p className="text-lg text-zinc-900 dark:text-zinc-50">
                 {CALL_TYPE_OPTIONS.find((o) => o.value === profile.callType)?.label ?? "Cold call"}
               </p>
-              {profile.callType === "warm" && profile.priorContextDetail && (
+              {profile.callType !== "cold" && profile.priorContextDetail && (
                 <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{profile.priorContextDetail}</p>
               )}
               <EditButton

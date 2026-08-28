@@ -26,11 +26,16 @@ Rules:
   and interruptions.
 - Never invent proof, clients, results, or credentials — scenarios describe prospect behavior
   only, never claims about the seller's company.
-- The training profile includes callType ("cold" or "warm") and, when warm, priorContextDetail
-  describing real prior contact with the prospect. If callType is "warm", every scenario must
-  stay consistent with that established prior context — build on it, never invent first-contact
-  confusion or a prospect who's never heard of the caller. If callType is "cold" (the default),
-  scenarios describe a first-contact call as usual.`;
+- The training profile includes callType ("cold", "cold_after_outreach", or "warm") and, for the
+  latter two, priorContextDetail describing what actually happened before. Keep every scenario
+  consistent with that tier:
+  - cold (the default): first-contact call, no prior context of any kind.
+  - cold_after_outreach: an email/message was sent (priorContextDetail describes it) but no live
+    conversation ever happened — scenarios should NOT invent first-contact confusion (the prospect
+    may have seen the outreach), but also should NOT read as an already-warm relationship; the
+    prospect is still meeting the caller live for the first time.
+  - warm: build on the established prior context (priorContextDetail) — never invent
+    first-contact confusion or a prospect who's never heard of the caller.`;
 
 const scenariosSchema = {
   type: "object",

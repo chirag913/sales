@@ -43,12 +43,19 @@ Rules:
   words. Each should reference a different specific moment from the call wherever possible. If the
   call really only has one significant issue, let biggestMistake cover it thoroughly and have
   betterResponses focus on other, smaller moments rather than re-describing the same issue again.
-- The call type (cold or warm) is given below. On a cold call, if the caller claimed prior contact
-  that didn't exist (e.g. "we spoke before," "you scheduled this") and the transcript shows the
-  prospect correctly denying it, score that as a real mistake — reflect it in the relevant
-  category's reason (Opening or Credibility are usually the right fit) and biggestMistake if it's
-  the most important issue, not as a neutral or unavoidable stumble. On a warm call, the caller
-  accurately referencing the real prior context is expected and correct — never penalize it.`;
+- The call type (cold, cold_after_outreach, or warm) is given below.
+  - On a cold call, if the caller claimed prior contact that didn't exist (e.g. "we spoke
+    before," "you scheduled this") and the transcript shows the prospect correctly denying it,
+    score that as a real mistake — reflect it in the relevant category's reason (Opening or
+    Credibility are usually the right fit) and biggestMistake if it's the most important issue,
+    not as a neutral or unavoidable stumble.
+  - On a cold_after_outreach call, judge a FALSE claim (a live conversation, an agreement, or a
+    scheduled call that never actually happened) by that same cold-call standard — it's a real
+    mistake, scored the same way. But correctly referencing the real outreach that was actually
+    sent (an email, a message) is not a mistake — give credit for it when used well (e.g. as a
+    natural opener), and never penalize the caller for referencing it.
+  - On a warm call, the caller accurately referencing the real prior context is expected and
+    correct — never penalize it.`;
 
 const scoreSchema = {
   type: "object",
@@ -140,10 +147,12 @@ export async function generateCallScore({
     .join("\n");
 
   const callType = trainingProfile.callType ?? "cold";
-  const callTypeLine =
-    callType === "warm"
-      ? `Call type: warm — the caller has real prior context with this prospect: ${trainingProfile.priorContextDetail}`
-      : `Call type: cold — this is first contact; the prospect has never spoken to this caller before.`;
+  const CALL_TYPE_LINES: Record<TrainingProfile["callType"], string> = {
+    cold: `Call type: cold — this is first contact; the prospect has never heard from this caller before.`,
+    cold_after_outreach: `Call type: cold_after_outreach — an email/message was sent first (${trainingProfile.priorContextDetail}), but no live conversation ever happened before this call.`,
+    warm: `Call type: warm — the caller has real prior context with this prospect: ${trainingProfile.priorContextDetail}`,
+  };
+  const callTypeLine = CALL_TYPE_LINES[callType];
 
   const userMessage = `Scenario: ${scenario.name} (${scenario.difficulty}) — ${scenario.description}
 Call objective: ${scenario.objective}

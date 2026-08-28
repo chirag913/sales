@@ -24,13 +24,30 @@ Rules:
   objective (e.g. "Book an onsite walkthrough / estimate").
 - additionalCriteria holds any other qualifying detail worth surfacing (e.g. facility size,
   vertical, sub-segment) — leave it as an empty array if nothing else is relevant.
-- callType is "warm" only if the input mentions prior contact, an inbound lead, a referral, or
-  an existing relationship with the prospect — default to "cold" otherwise, since cold outbound
-  is this product's primary use case. When callType is "warm", priorContextDetail must be a
-  SPECIFIC, plausible, truthful sentence about what actually happened before (e.g. "They filled
-  out a contact form last week asking about pricing") — never vague ("we talked before," "you've
-  spoken"), since the prospect needs to believably remember it. When callType is "cold",
-  priorContextDetail must be an empty string.`;
+- callType has three tiers, grounded in real sales practice — pick the closest match, defaulting
+  to "cold" when nothing in the input suggests otherwise, since cold outbound is this product's
+  primary use case:
+  - "cold": no contact of any kind — the default.
+  - "cold_after_outreach": the input mentions sending an email or message first ("I emailed
+    them," "following up," "sent an email") — but no reply, and no live conversation ever
+    happened.
+  - "warm": the input mentions an inbound lead, a referral, the prospect reaching out, or an
+    actual prior conversation.
+  priorContextDetail is required (and must be SPECIFIC and plausible — never vague like "we
+  talked before" or "you've spoken") for cold_after_outreach and warm, since the prospect needs
+  to believably remember it:
+  - cold_after_outreach: describe the actual outreach sent, e.g. "You emailed them on [rough
+    timeframe] about pricing, no reply yet."
+  - warm: describe the real established context, e.g. "They filled out a contact form last week
+    asking about pricing."
+  - cold: priorContextDetail must be an empty string — it's meaningless for pure cold.
+- likelyObjections must match the callType tier, not just be generic:
+  - cold: unfamiliarity/legitimacy objections ("who is this," "how'd you get this number").
+  - cold_after_outreach: mild recognition or none, with skepticism about the offer itself rather
+    than the caller's legitimacy ("I get a lot of these emails," "I don't recall seeing that,"
+    "not interested").
+  - warm: further-along objections — stalling, needing internal buy-in, timing, or reconsidering
+    something already partly discussed.`;
 
 const trainingProfileSchema = {
   type: "object",
@@ -49,7 +66,7 @@ const trainingProfileSchema = {
     },
     salesObjectiveDetail: { type: "string" },
     typicalProspect: { type: "string" },
-    callType: { type: "string", enum: ["cold", "warm"] },
+    callType: { type: "string", enum: ["cold", "cold_after_outreach", "warm"] },
     // Always present (OpenAI strict mode requires every property to be
     // required) — empty string when callType is "cold", same convention as
     // additionalCriteria being an empty array when nothing else applies.
