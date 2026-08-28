@@ -2,12 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { BuyCreditsButton } from "@/components/onboarding/BuyCreditsButton";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { FormField } from "@/components/ui/FormField";
 import { FormSection } from "@/components/ui/FormSection";
+import { CREDIT_PACK_CALLS, CREDIT_PACK_PRICE_INR, TRIAL_CALL_MINUTES } from "@/lib/config/pricing";
 import { READINESS_MIN_AVG_SCORE, READINESS_MIN_CALLS } from "@/lib/config/readiness";
 import { MyTeamResponse, TeamMemberAnalytics } from "@/lib/team/types";
+
+const QUANTITY_OPTIONS = Array.from({ length: 20 }, (_, i) => ({ value: String(i + 1), label: `${i + 1} pack${i === 0 ? "" : "s"}` }));
 
 async function fetchMyTeam(): Promise<MyTeamResponse | null> {
   try {
@@ -214,6 +218,49 @@ function TeamActivitySection({ analytics }: { analytics: TeamMemberAnalytics[] |
   );
 }
 
+function BuyTeamCreditsControl({ teamId, onPurchased }: { teamId: string; onPurchased: () => void }) {
+  const [quantity, setQuantity] = useState(1);
+  const totalCalls = CREDIT_PACK_CALLS * quantity;
+  const totalPrice = CREDIT_PACK_PRICE_INR * quantity;
+  const totalMinutes = totalCalls * TRIAL_CALL_MINUTES;
+
+  function handlePurchased() {
+    // The owner is also an active member of their own team, so their own
+    // nav badge shows the team pool (AuthenticatedShell) — same reason
+    // CreateTeamForm dispatches this, see its comment above.
+    window.dispatchEvent(new Event("team-entitlement-changed"));
+    onPurchased();
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
+      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Buy credits for your team</p>
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <div className="w-32">
+          <FormField
+            label="Packs"
+            type="select"
+            value={String(quantity)}
+            onChange={(v) => setQuantity(Number(v))}
+            options={QUANTITY_OPTIONS}
+          />
+        </div>
+        <p className="pb-2 text-sm text-zinc-500 dark:text-zinc-400">
+          {totalCalls} calls · up to {totalMinutes} min · ₹{totalPrice}
+        </p>
+      </div>
+      <div className="mt-3">
+        <BuyCreditsButton
+          quantity={quantity}
+          teamId={teamId}
+          onSuccess={handlePurchased}
+          label={`Buy ${totalCalls} calls — ₹${totalPrice}`}
+        />
+      </div>
+    </div>
+  );
+}
+
 function OwnerView({
   team,
   analytics,
@@ -244,6 +291,8 @@ function OwnerView({
       <div className="sm:col-span-2">
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Team credit pool</p>
         <p className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{team.creditsBalance} calls</p>
+
+        <BuyTeamCreditsControl teamId={team.teamId} onPurchased={onRefresh} />
 
         {team.members.length > 0 && (
           <div className="mt-5">

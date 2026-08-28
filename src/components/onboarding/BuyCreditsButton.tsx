@@ -41,11 +41,28 @@ interface BuyCreditsButtonProps {
   variant?: "button" | "link";
   className?: string;
   label?: string;
+  // Number of credit packs to buy in this one purchase (1-20, enforced
+  // server-side in /api/razorpay/create-order). Defaults to 1, matching
+  // this component's original single-pack-only behavior exactly.
+  quantity?: number;
+  // When set, credits go into this team's shared pool instead of the
+  // caller's own balance — /api/razorpay/create-order verifies server-side
+  // that the caller actually owns this team before creating the order.
+  teamId?: string;
 }
 
-export function BuyCreditsButton({ onSuccess, variant = "button", className, label: labelOverride }: BuyCreditsButtonProps) {
+export function BuyCreditsButton({
+  onSuccess,
+  variant = "button",
+  className,
+  label: labelOverride,
+  quantity = 1,
+  teamId,
+}: BuyCreditsButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const totalCalls = CREDIT_PACK_CALLS * quantity;
+  const totalPrice = CREDIT_PACK_PRICE_INR * quantity;
 
   async function handleClick() {
     setError(null);
@@ -53,7 +70,13 @@ export function BuyCreditsButton({ onSuccess, variant = "button", className, lab
     try {
       await loadCheckoutScript();
 
-      const orderRes = await fetch("/api/razorpay/create-order", { method: "POST" });
+      const orderRes = await fetch("/api/razorpay/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // JSON.stringify drops an undefined teamId key entirely, matching
+        // the individual-purchase request shape exactly when unset.
+        body: JSON.stringify({ quantity, teamId }),
+      });
       if (!orderRes.ok) throw new Error("Failed to start checkout.");
       const order = (await orderRes.json()) as {
         orderId: string;
@@ -69,7 +92,7 @@ export function BuyCreditsButton({ onSuccess, variant = "button", className, lab
           currency: order.currency,
           order_id: order.orderId,
           name: "BetterCallz",
-          description: `${CREDIT_PACK_CALLS} practice calls`,
+          description: `${totalCalls} practice calls`,
           handler: async (response: RazorpaySuccessResponse) => {
             try {
               const verifyRes = await fetch("/api/razorpay/verify", {
@@ -103,7 +126,7 @@ export function BuyCreditsButton({ onSuccess, variant = "button", className, lab
     }
   }
 
-  const label = loading ? "Please wait…" : (labelOverride ?? `Buy ${CREDIT_PACK_CALLS} calls — ₹${CREDIT_PACK_PRICE_INR}`);
+  const label = loading ? "Please wait…" : (labelOverride ?? `Buy ${totalCalls} calls — ₹${totalPrice}`);
 
   if (variant === "link") {
     return (
