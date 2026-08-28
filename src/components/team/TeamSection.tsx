@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { FormField } from "@/components/ui/FormField";
 import { FormSection } from "@/components/ui/FormSection";
-import { MyTeamResponse } from "@/lib/team/types";
+import { READINESS_MIN_AVG_SCORE, READINESS_MIN_CALLS } from "@/lib/config/readiness";
+import { MyTeamResponse, TeamMemberAnalytics } from "@/lib/team/types";
 
 async function fetchMyTeam(): Promise<MyTeamResponse | null> {
   try {
@@ -16,9 +18,24 @@ async function fetchMyTeam(): Promise<MyTeamResponse | null> {
   }
 }
 
+async function fetchTeamAnalytics(): Promise<TeamMemberAnalytics[] | null> {
+  try {
+    const res = await fetch("/api/teams/analytics");
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body.members as TeamMemberAnalytics[];
+  } catch {
+    return null;
+  }
+}
+
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function isReady(a: TeamMemberAnalytics): boolean {
+  return a.totalCalls >= READINESS_MIN_CALLS && (a.avgOverallScore ?? 0) >= READINESS_MIN_AVG_SCORE;
 }
 
 function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
@@ -139,7 +156,73 @@ function InviteForm({ teamId, onInvited }: { teamId: string; onInvited: () => vo
   );
 }
 
-function OwnerView({ team, onRefresh }: { team: Extract<MyTeamResponse, { role: "owner" }>; onRefresh: () => void }) {
+function TeamActivitySection({ analytics }: { analytics: TeamMemberAnalytics[] | null }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mt-5">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-left dark:border-zinc-800 dark:bg-zinc-950"
+      >
+        <span className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+          Team activity
+        </span>
+        <span className="flex items-center gap-1 text-xs text-zinc-400 dark:text-zinc-500">
+          {open ? "Hide" : "Show"}
+          {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-2 flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
+          {analytics === null ? (
+            <p className="py-3 text-sm text-zinc-400 dark:text-zinc-500">Loading activity…</p>
+          ) : analytics.length === 0 ? (
+            <p className="py-3 text-sm text-zinc-400 dark:text-zinc-500">No practice activity yet.</p>
+          ) : (
+            analytics.map((a) => (
+              <div key={a.userId} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-zinc-900 dark:text-zinc-50">{a.email}</p>
+                  {a.totalCalls === 0 ? (
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500">No calls yet</p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                        {a.totalCalls} call{a.totalCalls === 1 ? "" : "s"} · avg score {a.avgOverallScore} · last
+                        practiced {formatDate(a.lastCallAt)}
+                      </p>
+                      {a.topObjectionTags.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {a.topObjectionTags.map((tag) => (
+                            <Chip key={tag}>{tag}</Chip>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                <Chip tone={isReady(a) ? "positive" : "neutral"}>{isReady(a) ? "Ready" : "Still practicing"}</Chip>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OwnerView({
+  team,
+  analytics,
+  onRefresh,
+}: {
+  team: Extract<MyTeamResponse, { role: "owner" }>;
+  analytics: TeamMemberAnalytics[] | null;
+  onRefresh: () => void;
+}) {
   const [removing, setRemoving] = useState<string | null>(null);
 
   async function handleRemove(userId: string) {
@@ -193,6 +276,8 @@ function OwnerView({ team, onRefresh }: { team: Extract<MyTeamResponse, { role: 
           </div>
         )}
 
+        <TeamActivitySection analytics={analytics} />
+
         {team.invites.length > 0 && (
           <div className="mt-5">
             <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Pending invites</p>
@@ -228,12 +313,22 @@ function MemberView({ team }: { team: Extract<MyTeamResponse, { role: "member" }
 
 export function TeamSection() {
   const [team, setTeam] = useState<MyTeamResponse | null>(null);
+  const [analytics, setAnalytics] = useState<TeamMemberAnalytics[] | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Analytics rides the same refresh cycle as team data (mount, and after
+  // invite/remove/create actions) rather than having its own fetch
+  // lifecycle — only fetched at all when the caller turns out to be the
+  // owner, since /api/teams/analytics is owner-only.
   function refresh() {
     void fetchMyTeam().then((data) => {
       setTeam(data);
       setLoading(false);
+      if (data?.role === "owner") {
+        void fetchTeamAnalytics().then(setAnalytics);
+      } else {
+        setAnalytics(null);
+      }
     });
   }
 
@@ -243,7 +338,7 @@ export function TeamSection() {
 
   if (loading || !team) return null;
 
-  if (team.role === "owner") return <OwnerView team={team} onRefresh={refresh} />;
+  if (team.role === "owner") return <OwnerView team={team} analytics={analytics} onRefresh={refresh} />;
   if (team.role === "member") return <MemberView team={team} />;
   return <CreateTeamForm onCreated={refresh} />;
 }

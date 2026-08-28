@@ -4,9 +4,15 @@ interface ChipProps {
   children: ReactNode;
   onClick?: () => void;
   selected?: boolean;
+  // Read-only chips only (ignored when onClick is set — selection state
+  // already carries its own meaning there). "positive" is for a signal
+  // worth calling out favorably, e.g. a readiness badge — same emerald
+  // tone used for positive signals elsewhere (CallResultDetail's "new
+  // personal best" badge, AuthenticatedShell).
+  tone?: "neutral" | "positive";
 }
 
-export function Chip({ children, onClick, selected }: ChipProps) {
+export function Chip({ children, onClick, selected, tone = "neutral" }: ChipProps) {
   if (onClick) {
     return (
       <button
@@ -24,9 +30,10 @@ export function Chip({ children, onClick, selected }: ChipProps) {
     );
   }
 
-  return (
-    <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-sm text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-      {children}
-    </span>
-  );
+  const toneClasses =
+    tone === "positive"
+      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+      : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
+
+  return <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm ${toneClasses}`}>{children}</span>;
 }

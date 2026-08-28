@@ -38,3 +38,13 @@ export interface InvitePreview {
   teamName: string | null;
   email: string | null;
 }
+
+// GET /api/teams/analytics response — owner-only, per active member.
+export interface TeamMemberAnalytics {
+  userId: string;
+  email: string;
+  totalCalls: number;
+  avgOverallScore: number | null; // null when totalCalls is 0
+  lastCallAt: string | null;
+  topObjectionTags: string[]; // top 1-2 most frequent, [] when none
+}
