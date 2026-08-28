@@ -20,8 +20,11 @@ Rules:
   likelyObjections.
 - Phrase likelyObjections as things a real prospect would actually say out loud.
 - salesObjective must be the closest match of: book_meeting, book_demo, qualify_prospect,
-  make_sale. salesObjectiveDetail is a short, specific natural-language description of the
-  objective (e.g. "Book an onsite walkthrough / estimate").
+  make_sale. salesObjectiveDetail must be a SPECIFIC sentence describing exactly what closing
+  this call looks like for THIS business — never a restatement of the objective label itself.
+  For example, for make_sale write something like "Close the deal on this call for pest control
+  services, taking a card payment before hanging up," NOT "Make a sale" or "make_sale." For
+  book_demo, "Schedule a live product demo for next week," NOT "Book a demo."
 - additionalCriteria holds any other qualifying detail worth surfacing (e.g. facility size,
   vertical, sub-segment) — leave it as an empty array if nothing else is relevant.
 - callType has three tiers, grounded in real sales practice — pick the closest match, defaulting

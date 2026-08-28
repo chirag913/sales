@@ -2,7 +2,19 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Building2, CheckCircle2, Flag, PhoneCall, ShieldAlert, Target, User, Wrench } from "lucide-react";
+import {
+  AlertTriangle,
+  Building2,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Flag,
+  PhoneCall,
+  ShieldAlert,
+  Target,
+  User,
+  Wrench,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
@@ -84,6 +96,7 @@ export function ProfileReview({
   const [refineInput, setRefineInput] = useState("");
   const [refining, setRefining] = useState(false);
   const [refineError, setRefineError] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   const objectiveLabel = SALES_OBJECTIVE_OPTIONS.find((o) => o.value === profile.salesObjective)?.label;
 
@@ -133,6 +146,67 @@ export function ProfileReview({
     setDraft({});
   }
 
+  // Rendered once, placed into whichever tier matches its CURRENT (saved)
+  // value — never both. Deliberately keyed off profile.callType, not draft,
+  // so the card doesn't relocate itself out from under the user mid-edit;
+  // it only moves tiers after a Save commits a new value.
+  const callTypeCard = (
+    <Card icon={PhoneCall} title="Call Type" assumption={editingKey !== "callType" && profile.assumptions.callType}>
+      {editingKey === "callType" ? (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {CALL_TYPE_OPTIONS.map((opt) => (
+              <Chip
+                key={opt.value}
+                selected={(draft.callType ?? profile.callType) === opt.value}
+                onClick={() => setDraft((d) => ({ ...d, callType: opt.value }))}
+              >
+                {opt.label}
+              </Chip>
+            ))}
+          </div>
+          {(draft.callType ?? profile.callType) !== "cold" && (
+            <input
+              type="text"
+              className={`${INPUT_CLASSES} mt-3`}
+              value={draft.priorContextDetail ?? profile.priorContextDetail ?? ""}
+              onChange={(e) => setDraft((d) => ({ ...d, priorContextDetail: e.target.value }))}
+              placeholder={
+                (draft.callType ?? profile.callType) === "cold_after_outreach"
+                  ? "e.g. You emailed them last week about pricing, no reply yet."
+                  : "e.g. They requested a quote through your website last week."
+              }
+            />
+          )}
+          <EditActions
+            onSave={() =>
+              saveEdit(
+                {
+                  callType: draft.callType ?? profile.callType,
+                  priorContextDetail: draft.priorContextDetail ?? profile.priorContextDetail,
+                },
+                ["callType", "priorContextDetail"]
+              )
+            }
+            onCancel={cancelEdit}
+          />
+        </>
+      ) : (
+        <>
+          <p className="text-lg text-zinc-900 dark:text-zinc-50">
+            {CALL_TYPE_OPTIONS.find((o) => o.value === profile.callType)?.label ?? "Cold call"}
+          </p>
+          {profile.callType !== "cold" && profile.priorContextDetail && (
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{profile.priorContextDetail}</p>
+          )}
+          <EditButton
+            onClick={() => startEdit("callType", { callType: profile.callType, priorContextDetail: profile.priorContextDetail })}
+          />
+        </>
+      )}
+    </Card>
+  );
+
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-16">
       <div className="mb-8 text-center">
@@ -143,88 +217,6 @@ export function ProfileReview({
       </div>
 
       <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${refining ? "pointer-events-none opacity-60" : ""}`}>
-        <Card icon={PhoneCall} title="Call Type" assumption={editingKey !== "callType" && profile.assumptions.callType}>
-          {editingKey === "callType" ? (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {CALL_TYPE_OPTIONS.map((opt) => (
-                  <Chip
-                    key={opt.value}
-                    selected={(draft.callType ?? profile.callType) === opt.value}
-                    onClick={() => setDraft((d) => ({ ...d, callType: opt.value }))}
-                  >
-                    {opt.label}
-                  </Chip>
-                ))}
-              </div>
-              {(draft.callType ?? profile.callType) !== "cold" && (
-                <input
-                  type="text"
-                  className={`${INPUT_CLASSES} mt-3`}
-                  value={draft.priorContextDetail ?? profile.priorContextDetail ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, priorContextDetail: e.target.value }))}
-                  placeholder={
-                    (draft.callType ?? profile.callType) === "cold_after_outreach"
-                      ? "e.g. You emailed them last week about pricing, no reply yet."
-                      : "e.g. They requested a quote through your website last week."
-                  }
-                />
-              )}
-              <EditActions
-                onSave={() =>
-                  saveEdit(
-                    {
-                      callType: draft.callType ?? profile.callType,
-                      priorContextDetail: draft.priorContextDetail ?? profile.priorContextDetail,
-                    },
-                    ["callType", "priorContextDetail"]
-                  )
-                }
-                onCancel={cancelEdit}
-              />
-            </>
-          ) : (
-            <>
-              <p className="text-lg text-zinc-900 dark:text-zinc-50">
-                {CALL_TYPE_OPTIONS.find((o) => o.value === profile.callType)?.label ?? "Cold call"}
-              </p>
-              {profile.callType !== "cold" && profile.priorContextDetail && (
-                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{profile.priorContextDetail}</p>
-              )}
-              <EditButton
-                onClick={() => startEdit("callType", { callType: profile.callType, priorContextDetail: profile.priorContextDetail })}
-              />
-            </>
-          )}
-        </Card>
-
-        <Card icon={Target} title="Target Market" assumption={editingKey !== "market" && profile.assumptions.market}>
-          {editingKey === "market" ? (
-            <>
-              <select
-                className={INPUT_CLASSES}
-                value={draft.market ?? profile.market}
-                onChange={(e) => setDraft((d) => ({ ...d, market: e.target.value as TrainingProfile["market"] }))}
-              >
-                {PROSPECT_MARKET_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <EditActions
-                onSave={() => saveEdit({ market: draft.market ?? profile.market }, ["market"])}
-                onCancel={cancelEdit}
-              />
-            </>
-          ) : (
-            <>
-              <p className="text-lg text-zinc-900 dark:text-zinc-50">{MARKET_LABEL[profile.market] ?? profile.market}</p>
-              <EditButton onClick={() => startEdit("market", { market: profile.market })} />
-            </>
-          )}
-        </Card>
-
         <Card icon={Wrench} title="Service" assumption={editingKey !== "service" && profile.assumptions.service}>
           {editingKey === "service" ? (
             <>
@@ -268,114 +260,6 @@ export function ProfileReview({
                 ))}
               </div>
               <EditButton onClick={() => startEdit("icpTitles", { icpTitles: profile.icpTitles })} />
-            </>
-          )}
-        </Card>
-
-        <Card icon={Building2} title="Company Size" assumption={editingKey !== "companySize" && profile.assumptions.companySizeRange}>
-          {editingKey === "companySize" ? (
-            <>
-              <input
-                type="text"
-                className={INPUT_CLASSES}
-                value={draft.companySizeRange ?? profile.companySizeRange}
-                onChange={(e) => setDraft((d) => ({ ...d, companySizeRange: e.target.value }))}
-                placeholder="e.g. 10-100 employees"
-              />
-              <div className="mt-3">
-                <ChipsEditor
-                  values={draft.additionalCriteria ?? profile.additionalCriteria}
-                  onChange={(values) => setDraft((d) => ({ ...d, additionalCriteria: values }))}
-                  placeholder="Add a qualifying detail"
-                />
-              </div>
-              <EditActions
-                onSave={() =>
-                  saveEdit(
-                    {
-                      companySizeRange: draft.companySizeRange ?? profile.companySizeRange,
-                      additionalCriteria: draft.additionalCriteria ?? profile.additionalCriteria,
-                    },
-                    ["companySizeRange", "additionalCriteria"]
-                  )
-                }
-                onCancel={cancelEdit}
-              />
-            </>
-          ) : (
-            <>
-              <p className="text-lg text-zinc-900 dark:text-zinc-50">{profile.companySizeRange}</p>
-              {profile.additionalCriteria.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {profile.additionalCriteria.map((c) => (
-                    <Chip key={c}>{c}</Chip>
-                  ))}
-                </div>
-              )}
-              <EditButton
-                onClick={() =>
-                  startEdit("companySize", {
-                    companySizeRange: profile.companySizeRange,
-                    additionalCriteria: profile.additionalCriteria,
-                  })
-                }
-              />
-            </>
-          )}
-        </Card>
-
-        <Card icon={AlertTriangle} title="Likely Pain Points" assumption={editingKey !== "painPoints" && profile.assumptions.painPoints}>
-          {editingKey === "painPoints" ? (
-            <>
-              <ChipsEditor
-                values={draft.painPoints ?? profile.painPoints}
-                onChange={(values) => setDraft((d) => ({ ...d, painPoints: values }))}
-                placeholder="Add a pain point"
-              />
-              <EditActions
-                onSave={() => saveEdit({ painPoints: draft.painPoints ?? profile.painPoints }, ["painPoints"])}
-                onCancel={cancelEdit}
-              />
-            </>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {profile.painPoints.map((p) => (
-                  <Chip key={p}>{p}</Chip>
-                ))}
-              </div>
-              <EditButton onClick={() => startEdit("painPoints", { painPoints: profile.painPoints })} />
-            </>
-          )}
-        </Card>
-
-        <Card
-          icon={ShieldAlert}
-          title="Likely Objections"
-          assumption={editingKey !== "likelyObjections" && profile.assumptions.likelyObjections}
-        >
-          {editingKey === "likelyObjections" ? (
-            <>
-              <ChipsEditor
-                values={draft.likelyObjections ?? profile.likelyObjections}
-                onChange={(values) => setDraft((d) => ({ ...d, likelyObjections: values }))}
-                placeholder="Add an objection"
-              />
-              <EditActions
-                onSave={() =>
-                  saveEdit({ likelyObjections: draft.likelyObjections ?? profile.likelyObjections }, ["likelyObjections"])
-                }
-                onCancel={cancelEdit}
-              />
-            </>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {profile.likelyObjections.map((o) => (
-                  <Chip key={o}>{o}</Chip>
-                ))}
-              </div>
-              <EditButton onClick={() => startEdit("likelyObjections", { likelyObjections: profile.likelyObjections })} />
             </>
           )}
         </Card>
@@ -432,30 +316,187 @@ export function ProfileReview({
           )}
         </Card>
 
-        <Card
-          icon={User}
-          title="Typical Prospect"
-          assumption={editingKey !== "typicalProspect" && profile.assumptions.typicalProspect}
+        {profile.callType !== "cold" && callTypeCard}
+      </div>
+
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={() => setShowDetails((open) => !open)}
+          className="flex w-full items-center justify-between rounded-2xl border border-zinc-200/70 bg-white px-5 py-3 text-left dark:border-zinc-800 dark:bg-zinc-950"
         >
-          {editingKey === "typicalProspect" ? (
-            <>
-              <textarea
-                className={`${INPUT_CLASSES} min-h-[80px] resize-y`}
-                value={draft.typicalProspect ?? profile.typicalProspect}
-                onChange={(e) => setDraft((d) => ({ ...d, typicalProspect: e.target.value }))}
-              />
-              <EditActions
-                onSave={() => saveEdit({ typicalProspect: draft.typicalProspect ?? profile.typicalProspect }, ["typicalProspect"])}
-                onCancel={cancelEdit}
-              />
-            </>
-          ) : (
-            <>
-              <p className="text-zinc-700 dark:text-zinc-300">{profile.typicalProspect}</p>
-              <EditButton onClick={() => startEdit("typicalProspect", { typicalProspect: profile.typicalProspect })} />
-            </>
-          )}
-        </Card>
+          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Show all details</span>
+          <span className="flex items-center gap-1 text-xs text-zinc-400 dark:text-zinc-500">
+            {showDetails ? "Hide" : "Show"}
+            {showDetails ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+          </span>
+        </button>
+
+        {showDetails && (
+          <div className={`mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 ${refining ? "pointer-events-none opacity-60" : ""}`}>
+            <Card icon={Target} title="Target Market" assumption={editingKey !== "market" && profile.assumptions.market}>
+              {editingKey === "market" ? (
+                <>
+                  <select
+                    className={INPUT_CLASSES}
+                    value={draft.market ?? profile.market}
+                    onChange={(e) => setDraft((d) => ({ ...d, market: e.target.value as TrainingProfile["market"] }))}
+                  >
+                    {PROSPECT_MARKET_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <EditActions
+                    onSave={() => saveEdit({ market: draft.market ?? profile.market }, ["market"])}
+                    onCancel={cancelEdit}
+                  />
+                </>
+              ) : (
+                <>
+                  <p className="text-lg text-zinc-900 dark:text-zinc-50">{MARKET_LABEL[profile.market] ?? profile.market}</p>
+                  <EditButton onClick={() => startEdit("market", { market: profile.market })} />
+                </>
+              )}
+            </Card>
+
+            <Card icon={Building2} title="Company Size" assumption={editingKey !== "companySize" && profile.assumptions.companySizeRange}>
+              {editingKey === "companySize" ? (
+                <>
+                  <input
+                    type="text"
+                    className={INPUT_CLASSES}
+                    value={draft.companySizeRange ?? profile.companySizeRange}
+                    onChange={(e) => setDraft((d) => ({ ...d, companySizeRange: e.target.value }))}
+                    placeholder="e.g. 10-100 employees"
+                  />
+                  <div className="mt-3">
+                    <ChipsEditor
+                      values={draft.additionalCriteria ?? profile.additionalCriteria}
+                      onChange={(values) => setDraft((d) => ({ ...d, additionalCriteria: values }))}
+                      placeholder="Add a qualifying detail"
+                    />
+                  </div>
+                  <EditActions
+                    onSave={() =>
+                      saveEdit(
+                        {
+                          companySizeRange: draft.companySizeRange ?? profile.companySizeRange,
+                          additionalCriteria: draft.additionalCriteria ?? profile.additionalCriteria,
+                        },
+                        ["companySizeRange", "additionalCriteria"]
+                      )
+                    }
+                    onCancel={cancelEdit}
+                  />
+                </>
+              ) : (
+                <>
+                  <p className="text-lg text-zinc-900 dark:text-zinc-50">{profile.companySizeRange}</p>
+                  {profile.additionalCriteria.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {profile.additionalCriteria.map((c) => (
+                        <Chip key={c}>{c}</Chip>
+                      ))}
+                    </div>
+                  )}
+                  <EditButton
+                    onClick={() =>
+                      startEdit("companySize", {
+                        companySizeRange: profile.companySizeRange,
+                        additionalCriteria: profile.additionalCriteria,
+                      })
+                    }
+                  />
+                </>
+              )}
+            </Card>
+
+            <Card icon={AlertTriangle} title="Likely Pain Points" assumption={editingKey !== "painPoints" && profile.assumptions.painPoints}>
+              {editingKey === "painPoints" ? (
+                <>
+                  <ChipsEditor
+                    values={draft.painPoints ?? profile.painPoints}
+                    onChange={(values) => setDraft((d) => ({ ...d, painPoints: values }))}
+                    placeholder="Add a pain point"
+                  />
+                  <EditActions
+                    onSave={() => saveEdit({ painPoints: draft.painPoints ?? profile.painPoints }, ["painPoints"])}
+                    onCancel={cancelEdit}
+                  />
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.painPoints.map((p) => (
+                      <Chip key={p}>{p}</Chip>
+                    ))}
+                  </div>
+                  <EditButton onClick={() => startEdit("painPoints", { painPoints: profile.painPoints })} />
+                </>
+              )}
+            </Card>
+
+            <Card
+              icon={ShieldAlert}
+              title="Likely Objections"
+              assumption={editingKey !== "likelyObjections" && profile.assumptions.likelyObjections}
+            >
+              {editingKey === "likelyObjections" ? (
+                <>
+                  <ChipsEditor
+                    values={draft.likelyObjections ?? profile.likelyObjections}
+                    onChange={(values) => setDraft((d) => ({ ...d, likelyObjections: values }))}
+                    placeholder="Add an objection"
+                  />
+                  <EditActions
+                    onSave={() =>
+                      saveEdit({ likelyObjections: draft.likelyObjections ?? profile.likelyObjections }, ["likelyObjections"])
+                    }
+                    onCancel={cancelEdit}
+                  />
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.likelyObjections.map((o) => (
+                      <Chip key={o}>{o}</Chip>
+                    ))}
+                  </div>
+                  <EditButton onClick={() => startEdit("likelyObjections", { likelyObjections: profile.likelyObjections })} />
+                </>
+              )}
+            </Card>
+
+            <Card
+              icon={User}
+              title="Typical Prospect"
+              assumption={editingKey !== "typicalProspect" && profile.assumptions.typicalProspect}
+            >
+              {editingKey === "typicalProspect" ? (
+                <>
+                  <textarea
+                    className={`${INPUT_CLASSES} min-h-[80px] resize-y`}
+                    value={draft.typicalProspect ?? profile.typicalProspect}
+                    onChange={(e) => setDraft((d) => ({ ...d, typicalProspect: e.target.value }))}
+                  />
+                  <EditActions
+                    onSave={() => saveEdit({ typicalProspect: draft.typicalProspect ?? profile.typicalProspect }, ["typicalProspect"])}
+                    onCancel={cancelEdit}
+                  />
+                </>
+              ) : (
+                <>
+                  <p className="text-zinc-700 dark:text-zinc-300">{profile.typicalProspect}</p>
+                  <EditButton onClick={() => startEdit("typicalProspect", { typicalProspect: profile.typicalProspect })} />
+                </>
+              )}
+            </Card>
+
+            {profile.callType === "cold" && callTypeCard}
+          </div>
+        )}
       </div>
 
       <div className="mt-8 rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
