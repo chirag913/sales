@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { History, LogOut } from "lucide-react";
+import { History, LogOut, User } from "lucide-react";
 import { BuyCreditsButton } from "@/components/onboarding/BuyCreditsButton";
 import { Logo } from "@/components/ui/Logo";
 import { EntitlementStatus } from "@/lib/entitlement/types";
@@ -53,6 +53,7 @@ async function fetchEntitlement(): Promise<EntitlementStatus | null> {
 const NAV_LINKS = [
   { href: "/practice", label: "Practice" },
   { href: "/history", label: "History" },
+  { href: "/profile", label: "Profile" },
 ];
 
 export function AuthenticatedShell({ children }: { children: ReactNode }) {
@@ -145,6 +146,13 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
               className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-200 sm:hidden"
             >
               <History className="h-4 w-4" aria-hidden />
+            </Link>
+            <Link
+              href="/profile"
+              aria-label="Profile"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-200 sm:hidden"
+            >
+              <User className="h-4 w-4" aria-hidden />
             </Link>
           </div>
         </div>
