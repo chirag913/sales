@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AuthenticatedShell } from "@/components/auth/AuthenticatedShell";
 import { AuthScreen } from "@/components/auth/AuthScreen";
 import { ProfileForm } from "@/components/profile/ProfileForm";
+import { TeamSection } from "@/components/team/TeamSection";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ProfilePage() {
@@ -24,6 +25,9 @@ export default async function ProfilePage() {
           during calls. None of this is required to start training — it will never invent clients, results, or
           offices beyond what you enter here.
         </p>
+        <div className="mt-8">
+          <TeamSection />
+        </div>
         <div className="mt-8">
           <ProfileForm />
         </div>

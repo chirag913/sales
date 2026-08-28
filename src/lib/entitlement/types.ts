@@ -8,4 +8,11 @@ export interface EntitlementStatus {
   trialRemaining: number;
   canStartCall: boolean;
   isAdmin: boolean;
+  // isTeamMember=true means calls draw from teamCredits, not credits —
+  // credits is still the personal balance, but reserve_call_entitlement
+  // never consults it while the user is on a team. See
+  // supabase/migrations/0013_teams.sql.
+  isTeamMember: boolean;
+  teamName: string | null;
+  teamCredits: number | null;
 }

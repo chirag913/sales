@@ -15,6 +15,15 @@ import { createClient } from "@/lib/supabase/client";
 // a small badge rather than an accounting dashboard.
 function usageBadgeText(entitlement: EntitlementStatus): string {
   const trialText = `${entitlement.trialRemaining} free trial call${entitlement.trialRemaining === 1 ? "" : "s"}`;
+
+  // Team members draw from the team's pool, never their own credits_balance
+  // (see reserve_call_entitlement in supabase/migrations/0013_teams.sql) —
+  // show the pool, not a personal credit count that reserve never consults.
+  if (entitlement.isTeamMember) {
+    const poolText = `Team pool: ${entitlement.teamCredits ?? 0} call${entitlement.teamCredits === 1 ? "" : "s"}`;
+    return entitlement.trialRemaining > 0 ? `${trialText} + ${poolText}` : poolText;
+  }
+
   const creditsText = `${entitlement.credits} credit${entitlement.credits === 1 ? "" : "s"}`;
 
   // Buying credits is now reachable at any time (not just once the trial is
@@ -56,8 +65,20 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
     void fetchEntitlement().then((data) => {
       if (!cancelled && data) setEntitlement(data);
     });
+
+    // Creating/joining a team changes what this badge should show without
+    // a page navigation (see TeamSection.tsx) — listen for that rather than
+    // only ever fetching once on mount.
+    function handleEntitlementChanged() {
+      void fetchEntitlement().then((data) => {
+        if (!cancelled && data) setEntitlement(data);
+      });
+    }
+    window.addEventListener("team-entitlement-changed", handleEntitlementChanged);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("team-entitlement-changed", handleEntitlementChanged);
     };
   }, []);
 
@@ -98,9 +119,12 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
                 {usageBadgeText(entitlement)}
               </span>
             )}
-            {entitlement && (
+            {entitlement && !entitlement.isTeamMember && (
               // Always reachable, regardless of remaining balance or admin status —
               // credits can be topped up anytime, not just once fully exhausted.
+              // Hidden for team members: reserve_call_entitlement never consults
+              // a team member's personal credits_balance, so a purchase here
+              // would strand real money on a balance that can never be spent.
               <BuyCreditsButton
                 variant="link"
                 className="text-xs font-medium text-emerald-600 dark:text-emerald-400"

@@ -26,6 +26,9 @@ export async function GET() {
     trial_remaining: number;
     can_start_call: boolean;
     is_admin: boolean;
+    is_team_member: boolean;
+    team_name: string | null;
+    team_credits: number | null;
   };
 
   const status: EntitlementStatus = {
@@ -35,6 +38,9 @@ export async function GET() {
     trialRemaining: row.trial_remaining,
     canStartCall: row.can_start_call,
     isAdmin: row.is_admin,
+    isTeamMember: row.is_team_member,
+    teamName: row.team_name,
+    teamCredits: row.team_credits,
   };
 
   return NextResponse.json(status);

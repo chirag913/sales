@@ -320,6 +320,7 @@ export function TrainingSetup() {
   if (step === "paywall") {
     return (
       <Paywall
+        entitlement={entitlement}
         onBack={() => setStep(stepBeforePaywall)}
         onPurchased={() => {
           void refreshEntitlement();
