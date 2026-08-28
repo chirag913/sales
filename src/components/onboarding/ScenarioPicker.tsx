@@ -26,6 +26,31 @@ const VOICE_PREFERENCE_OPTIONS: { value: ProspectGenderPreference; label: string
   { value: "female", label: "Female" },
 ];
 
+// Safety net, not the primary fix (that's the SYSTEM_PROMPT wording in
+// src/lib/ai/scenarios.ts) — occasionally the model still degenerates an
+// objective into something label-like ("book_demo", "qualifyprospect")
+// instead of a natural sentence. Only touches text that actually looks like
+// a slug: underscores/hyphens with no spaces at all, or a single bare
+// lowercase run — never a real sentence, which always has spaces and/or
+// punctuation (so "follow-up call" is left alone: it has a space).
+function isSlugLike(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  const hasSeparatorWithNoSpaces = /[_-]/.test(trimmed) && !/\s/.test(trimmed);
+  const isBareLowercaseWord = /^[a-z]+$/.test(trimmed);
+  return hasSeparatorWithNoSpaces || isBareLowercaseWord;
+}
+
+function humanize(text: string): string {
+  if (!isSlugLike(text)) return text;
+  return text
+    .replace(/[_-]+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export function ScenarioPicker({
   scenarios,
   onSelect,
@@ -77,12 +102,17 @@ export function ScenarioPicker({
             key={scenario.id}
             type="button"
             onClick={() => onSelect(scenario)}
-            className="flex flex-col items-start gap-2 rounded-2xl border border-zinc-200/70 bg-white p-5 text-left shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950"
+            className="flex flex-col items-start gap-3 rounded-2xl border border-zinc-200/70 bg-white p-5 text-left shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950"
           >
             <div className="flex w-full items-center justify-between gap-2">
-              <span className="flex items-center gap-2 text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                <span aria-hidden>{scenario.icon}</span>
-                {scenario.name}
+              <span className="flex items-center gap-3">
+                <span
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base ${DIFFICULTY_STYLE[scenario.difficulty]}`}
+                  aria-hidden
+                >
+                  {scenario.icon}
+                </span>
+                <span className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{scenario.name}</span>
               </span>
               <span
                 className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${DIFFICULTY_STYLE[scenario.difficulty]}`}
@@ -91,7 +121,7 @@ export function ScenarioPicker({
               </span>
             </div>
             <p className="text-sm text-zinc-600 dark:text-zinc-400">{scenario.description}</p>
-            <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500">Objective: {scenario.objective}</p>
+            <Chip>{humanize(scenario.objective)}</Chip>
           </button>
         ))}
 
