@@ -11,9 +11,8 @@ of difficulty.
 
 Rules:
 - Each scenario needs: a short evocative name (2-4 words, e.g. "Skeptical Office Manager"), a
-  leading emoji icon signaling its difficulty/vibe (🟢 easy-going, 🟡 moderate, 🟠 tough, 🔴 very
-  tough, 💀 nightmare), a one-line description of the prospect's mindset/behavior, a difficulty
-  of Easy/Medium/Hard/Expert, and a recommended objective for that specific call (this can differ
+  one-line description of the prospect's mindset/behavior, a difficulty of Easy/Medium/Hard/Expert,
+  and a recommended objective for that specific call (this can differ
   from the profile's default objective when the scenario calls for it — e.g. a skeptical scenario
   might recommend qualifying the prospect rather than going straight for a meeting). Write the
   objective as a short natural sentence a person would actually say out loud — never a label,
@@ -47,13 +46,12 @@ const scenariosSchema = {
         type: "object",
         additionalProperties: false,
         properties: {
-          icon: { type: "string" },
           name: { type: "string" },
           description: { type: "string" },
           difficulty: { type: "string", enum: ["Easy", "Medium", "Hard", "Expert"] },
           objective: { type: "string" },
         },
-        required: ["icon", "name", "description", "difficulty", "objective"],
+        required: ["name", "description", "difficulty", "objective"],
       },
     },
   },

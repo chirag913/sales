@@ -121,7 +121,6 @@ export type ScenarioDifficulty = "Easy" | "Medium" | "Hard" | "Expert";
 
 export interface Scenario {
   id: string;
-  icon: string;
   name: string;
   description: string;
   difficulty: ScenarioDifficulty;

@@ -20,6 +20,19 @@ const DIFFICULTY_STYLE: Record<Scenario["difficulty"], string> = {
   Expert: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
 };
 
+// Fixed per-tier marker — deliberately the same quiet dot for every
+// difficulty, not a per-scenario emoji the model invents (that produced
+// things like a skull for "Expert", which reads as gaming-app tone rather
+// than the muted, restrained visual language used everywhere else). The
+// color alone (DIFFICULTY_STYLE, inherited via currentColor) is what
+// actually signals severity here.
+const DIFFICULTY_ICON: Record<Scenario["difficulty"], string> = {
+  Easy: "●",
+  Medium: "●",
+  Hard: "●",
+  Expert: "●",
+};
+
 const VOICE_PREFERENCE_OPTIONS: { value: ProspectGenderPreference; label: string }[] = [
   { value: "any", label: "Any voice" },
   { value: "male", label: "Male" },
@@ -110,7 +123,7 @@ export function ScenarioPicker({
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base ${DIFFICULTY_STYLE[scenario.difficulty]}`}
                   aria-hidden
                 >
-                  {scenario.icon}
+                  {DIFFICULTY_ICON[scenario.difficulty]}
                 </span>
                 <span className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{scenario.name}</span>
               </span>

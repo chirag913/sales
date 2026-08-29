@@ -56,7 +56,7 @@ export function ReadyToCall({ profile, scenario, identity, onBack, onStartCall }
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Scenario</dt>
             <dd className="text-zinc-900 dark:text-zinc-50">
-              {scenario.icon} {scenario.name} · {scenario.difficulty}
+              {scenario.name} · {scenario.difficulty}
             </dd>
           </div>
           <div>

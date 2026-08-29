@@ -78,7 +78,7 @@ export function CallHistoryList({ calls }: { calls: CallHistoryEntry[] }) {
                   <ProspectAvatar identity={call.identity} size="sm" />
                   <div>
                     <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-                      {call.scenario.icon} {call.scenario.name}{" "}
+                      {call.scenario.name}{" "}
                       <span className="font-normal text-zinc-500 dark:text-zinc-400">
                         vs {call.identity.fullName}, {call.identity.title}
                       </span>

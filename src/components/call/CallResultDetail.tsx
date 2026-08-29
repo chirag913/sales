@@ -8,7 +8,7 @@ import { ScoreGauge } from "@/components/ui/ScoreGauge";
 import { BetterResponseMoment, CallScoreResult, ProspectIdentity, Scenario, TranscriptEntry } from "@/lib/types";
 
 interface CallResultDetailProps {
-  scenario: Pick<Scenario, "icon" | "name">;
+  scenario: Pick<Scenario, "name">;
   durationSeconds: number;
   result: CallScoreResult;
   transcript: TranscriptEntry[] | null;
@@ -158,7 +158,7 @@ export function CallResultDetail({
           </div>
         )}
         <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          {scenario.icon} {scenario.name} · {formatCallDuration(durationSeconds)}
+          {scenario.name} · {formatCallDuration(durationSeconds)}
         </p>
         <div className="mt-4">
           <ScoreGauge value={result.overallScore} />

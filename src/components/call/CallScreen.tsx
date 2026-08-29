@@ -160,7 +160,7 @@ export function CallScreen({
               {identity.fullName} <span className="font-normal text-zinc-500 dark:text-zinc-400">— {identity.title}, {identity.company}</span>
             </p>
             <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-              {scenario.icon} {scenario.name} · {scenario.difficulty}
+              {scenario.name} · {scenario.difficulty}
             </p>
             <p className="mt-1 flex items-center gap-2 text-sm">
               <span className={`h-2 w-2 rounded-full ${dotClass}`} />
