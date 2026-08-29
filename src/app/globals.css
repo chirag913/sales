@@ -1,8 +1,20 @@
 @import "tailwindcss";
 
+/* Tailwind v4's dark: variant defaults to prefers-color-scheme — this
+   overrides it to a class-based strategy instead, so dark mode is an
+   explicit user choice (ThemeToggle) rather than following the OS. See
+   src/app/layout.tsx's inline theme-init script for how the class gets
+   applied before first paint. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+:root.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -10,13 +22,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {

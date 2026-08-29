@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { PRIMARY_LINK_CLASSES } from "@/components/ui/linkButtonClasses";
 
 export function LandingNav() {
@@ -37,9 +38,12 @@ export function LandingNav() {
             Pricing
           </a>
         </nav>
-        <Link href="/practice" className={PRIMARY_LINK_CLASSES}>
-          Start free
-        </Link>
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <Link href="/practice" className={PRIMARY_LINK_CLASSES}>
+            Start free
+          </Link>
+        </div>
       </div>
     </header>
   );

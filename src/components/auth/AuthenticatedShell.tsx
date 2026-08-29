@@ -7,6 +7,7 @@ import { ChevronDown, History, User } from "lucide-react";
 import { BuyCreditsButton } from "@/components/onboarding/BuyCreditsButton";
 import { InitialsAvatar } from "@/components/ui/InitialsAvatar";
 import { Logo } from "@/components/ui/Logo";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { EntitlementStatus } from "@/lib/entitlement/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -138,6 +139,7 @@ function UserMenu({
           >
             Profile &amp; settings
           </Link>
+          <ThemeToggle variant="menuitem" />
           <button
             type="button"
             role="menuitem"
