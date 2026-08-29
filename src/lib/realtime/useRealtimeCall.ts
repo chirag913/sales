@@ -44,6 +44,70 @@ function finalizeEntry(transcript: TranscriptEntry[], id: string): TranscriptEnt
   return transcript.map((e) => (e.id === id ? { ...e, final: true } : e));
 }
 
+// Ring tone during "connecting" and disconnect tone on hangup — both
+// synthesized via Web Audio oscillators (same approach this file already
+// uses for amplitude analysis) rather than sourced audio files. That
+// sidesteps any licensing question around reproducing a real telco's tone,
+// and a single generic pitch beeped twice ("ring-ring... pause...") reads
+// as "phone ringing" universally without imitating one country's specific
+// pattern (e.g. not the US 440+480Hz dual-frequency ringback) — this app's
+// audience spans US/UK/Canada/Australia.
+const RING_TONE_FREQ_HZ = 480;
+const RING_BEEP_DURATION_S = 0.15;
+const RING_BEEP_GAP_S = 0.15;
+const RING_CYCLE_S = 1.5;
+
+// Perceived pickup (audible AI voice + status flipping to "connected") is
+// gated on whichever is later: this minimum, or the real connection
+// actually being ready — see triggerPickup and the dc "open" handler in
+// start(). Long enough to read as a natural ring, short enough not to feel
+// like a stall on a fast connection.
+const RING_MIN_DURATION_MS = 2500;
+
+// Disconnect tone on hangup — two short descending beeps, which reads as
+// "call ended" without imitating any specific carrier's tone.
+const DISCONNECT_TONE_FREQ_HIGH_HZ = 420;
+const DISCONNECT_TONE_FREQ_LOW_HZ = 300;
+const DISCONNECT_BEEP_DURATION_S = 0.16;
+const DISCONNECT_BEEP_GAP_S = 0.08;
+// cleanup() waits this long after scheduling the disconnect tone before
+// actually tearing down (closing the AudioContext would cut the tone off
+// mid-play) — long enough for the ~0.4s of beeps plus a little trailing air.
+const DISCONNECT_TEARDOWN_DELAY_MS = 700;
+
+// Short linear ramps in/out rather than an instant on/off step, so each
+// beep starts and stops cleanly instead of producing an audible click.
+function scheduleBeep(audioContext: AudioContext, destination: AudioNode, freq: number, startTime: number, duration: number): void {
+  const oscillator = audioContext.createOscillator();
+  oscillator.type = "sine";
+  oscillator.frequency.value = freq;
+
+  const envelope = audioContext.createGain();
+  const attack = 0.008;
+  const release = Math.min(0.03, duration / 3);
+  envelope.gain.setValueAtTime(0, startTime);
+  envelope.gain.linearRampToValueAtTime(1, startTime + attack);
+  envelope.gain.setValueAtTime(1, Math.max(startTime + attack, startTime + duration - release));
+  envelope.gain.linearRampToValueAtTime(0, startTime + duration);
+
+  oscillator.connect(envelope);
+  envelope.connect(destination);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + duration + 0.02);
+}
+
+function playDisconnectTone(audioContext: AudioContext): void {
+  const t0 = audioContext.currentTime;
+  scheduleBeep(audioContext, audioContext.destination, DISCONNECT_TONE_FREQ_HIGH_HZ, t0, DISCONNECT_BEEP_DURATION_S);
+  scheduleBeep(
+    audioContext,
+    audioContext.destination,
+    DISCONNECT_TONE_FREQ_LOW_HZ,
+    t0 + DISCONNECT_BEEP_DURATION_S + DISCONNECT_BEEP_GAP_S,
+    DISCONNECT_BEEP_DURATION_S
+  );
+}
+
 // Client-side noise gate thresholds — see startAmplitudeLoop for how these
 // are used. OPEN_THRESHOLD is a starting guess (0-1, same scale as
 // userAmplitudeRef) — tune up if real speech still gets gated out, or down
@@ -87,6 +151,22 @@ export function useRealtimeCall() {
   const noiseGateRef = useRef<GainNode | null>(null);
   const noiseGateOpenUntilRef = useRef(0);
 
+  // Ring tone + perceived-pickup gating (see constants above).
+  const ringGainRef = useRef<GainNode | null>(null);
+  const ringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ringStartTimeRef = useRef(0);
+  const pickupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pickupTriggeredRef = useRef(false);
+  // Whether this call ever actually reached "connected" — cleanup() only
+  // plays the disconnect tone for a call that was picked up, not one
+  // cancelled mid-ring or one that failed to connect at all.
+  const wasConnectedRef = useRef(false);
+  // Guards cleanup() against running twice for the same call (e.g. stop()
+  // called from both the explicit End Call handler and the mount-effect's
+  // unmount cleanup) — without this, a second call could close resources
+  // the first call's disconnect-tone delay is still relying on.
+  const cleanupStartedRef = useRef(false);
+
   const startAmplitudeLoop = useCallback(() => {
     const tick = () => {
       const userAnalyser = userAnalyserRef.current;
@@ -128,7 +208,66 @@ export function useRealtimeCall() {
     amplitudeFrameRef.current = requestAnimationFrame(tick);
   }, []);
 
-  const cleanup = useCallback(() => {
+  const startRingTone = useCallback((audioContext: AudioContext) => {
+    const masterGain = audioContext.createGain();
+    masterGain.gain.value = 1;
+    masterGain.connect(audioContext.destination);
+    ringGainRef.current = masterGain;
+
+    const scheduleCycle = () => {
+      const gain = ringGainRef.current;
+      if (!gain) return;
+      const t0 = audioContext.currentTime;
+      scheduleBeep(audioContext, gain, RING_TONE_FREQ_HZ, t0, RING_BEEP_DURATION_S);
+      scheduleBeep(audioContext, gain, RING_TONE_FREQ_HZ, t0 + RING_BEEP_DURATION_S + RING_BEEP_GAP_S, RING_BEEP_DURATION_S);
+    };
+
+    scheduleCycle();
+    ringIntervalRef.current = setInterval(scheduleCycle, RING_CYCLE_S * 1000);
+  }, []);
+
+  const stopRingTone = useCallback(() => {
+    if (ringIntervalRef.current !== null) {
+      clearInterval(ringIntervalRef.current);
+      ringIntervalRef.current = null;
+    }
+    const gain = ringGainRef.current;
+    const audioContext = audioContextRef.current;
+    if (gain && audioContext && audioContext.state !== "closed") {
+      // Fade out rather than disconnecting outright — avoids the click a
+      // hard cut produces if this lands mid-beep.
+      const now = audioContext.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(0, now + 0.15);
+    }
+    ringGainRef.current = null;
+  }, []);
+
+  // Fires once, whichever happens later: the real connection finishing
+  // (dc "open") or the minimum ring duration elapsing. Never fires early —
+  // see the dc "open" handler in start(), which schedules this for
+  // whatever time remains instead of calling it directly.
+  const triggerPickup = useCallback(() => {
+    if (pickupTriggeredRef.current) return;
+    pickupTriggeredRef.current = true;
+    if (pickupTimeoutRef.current !== null) {
+      clearTimeout(pickupTimeoutRef.current);
+      pickupTimeoutRef.current = null;
+    }
+    stopRingTone();
+    // The real track/analyser wiring in pc.ontrack already ran the moment
+    // the connection was ready, unaffected by this gate — only the audible
+    // output was held back until now.
+    if (audioElRef.current) audioElRef.current.muted = false;
+    wasConnectedRef.current = true;
+    setStatus("connected");
+  }, [stopRingTone]);
+
+  const cleanup = useCallback(async () => {
+    if (cleanupStartedRef.current) return;
+    cleanupStartedRef.current = true;
+
     if (amplitudeFrameRef.current !== null) {
       cancelAnimationFrame(amplitudeFrameRef.current);
       amplitudeFrameRef.current = null;
@@ -137,6 +276,22 @@ export function useRealtimeCall() {
       clearInterval(countdownIntervalRef.current);
       countdownIntervalRef.current = null;
     }
+    if (pickupTimeoutRef.current !== null) {
+      clearTimeout(pickupTimeoutRef.current);
+      pickupTimeoutRef.current = null;
+    }
+    stopRingTone();
+
+    // Play the disconnect tone — and wait for it — before tearing anything
+    // down below, since closing the AudioContext would cut it off mid-play.
+    // Only for a call that actually connected; cancelling mid-ring shouldn't
+    // play a "call ended" tone for a call that never started.
+    const audioContext = audioContextRef.current;
+    if (wasConnectedRef.current && audioContext && audioContext.state !== "closed") {
+      playDisconnectTone(audioContext);
+      await new Promise<void>((resolve) => setTimeout(resolve, DISCONNECT_TEARDOWN_DELAY_MS));
+    }
+
     dcRef.current?.close();
     dcRef.current = null;
     pcRef.current?.getSenders().forEach((sender) => sender.track?.stop());
@@ -158,33 +313,31 @@ export function useRealtimeCall() {
     prospectAmplitudeRef.current = 0;
     noiseGateRef.current = null;
     noiseGateOpenUntilRef.current = 0;
-  }, []);
+  }, [stopRingTone]);
 
-  const startCountdown = useCallback(
-    (deadlineIso: string) => {
-      const deadline = new Date(deadlineIso).getTime();
-      deadlineAtRef.current = deadline;
+  // Only flips timedOut — CallScreen's own effect on that flag is the sole
+  // place that calls stop()/onEnd(), same path as the explicit End Call
+  // button, so the disconnect tone plays exactly once either way rather
+  // than being triggered from here too.
+  const startCountdown = useCallback((deadlineIso: string) => {
+    const deadline = new Date(deadlineIso).getTime();
+    deadlineAtRef.current = deadline;
 
-      const tick = () => {
-        const remaining = Math.max(0, Math.round((deadline - Date.now()) / 1000));
-        setRemainingSeconds(remaining);
-        if (remaining <= 0) {
-          if (countdownIntervalRef.current !== null) {
-            clearInterval(countdownIntervalRef.current);
-            countdownIntervalRef.current = null;
-          }
-          setTimedOut(true);
-          cleanup();
-          setStatus((prev) => (prev === "idle" ? prev : "ended"));
-          setSpeaking(false);
+    const tick = () => {
+      const remaining = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+      setRemainingSeconds(remaining);
+      if (remaining <= 0) {
+        if (countdownIntervalRef.current !== null) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
         }
-      };
+        setTimedOut(true);
+      }
+    };
 
-      tick();
-      countdownIntervalRef.current = setInterval(tick, 1000);
-    },
-    [cleanup]
-  );
+    tick();
+    countdownIntervalRef.current = setInterval(tick, 1000);
+  }, []);
 
   const start = useCallback(
     async ({ salesProfile, trainingProfile, scenario, identity }: StartArgs) => {
@@ -195,8 +348,22 @@ export function useRealtimeCall() {
       setRemainingSeconds(null);
       setTimedOut(false);
       setEntitlementExhausted(false);
+      cleanupStartedRef.current = false;
+      wasConnectedRef.current = false;
+      pickupTriggeredRef.current = false;
 
       try {
+        // Created and started before the token fetch below — rings
+        // immediately rather than after a network round trip. The rest of
+        // this call's audio (amplitude analysis, noise gate) reuses this
+        // same AudioContext once the connection is actually set up.
+        const audioContext = new AudioContext();
+        audioContextRef.current = audioContext;
+        audioContext.resume().catch(() => {});
+        ringStartTimeRef.current = performance.now();
+        startRingTone(audioContext);
+        startAmplitudeLoop();
+
         const tokenRes = await fetch("/api/realtime/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -207,6 +374,9 @@ export function useRealtimeCall() {
           if (tokenRes.status === 403 && body?.error === "entitlement_required") {
             setEntitlementExhausted(true);
             setStatus("error");
+            // Not thrown, so this bypasses the catch block below — without
+            // this the ring tone and AudioContext started above would leak.
+            void cleanup();
             return;
           }
           throw new Error(body?.error ?? "Failed to start call session.");
@@ -222,13 +392,12 @@ export function useRealtimeCall() {
         const pc = new RTCPeerConnection();
         pcRef.current = pc;
 
-        const audioContext = new AudioContext();
-        audioContextRef.current = audioContext;
-        audioContext.resume().catch(() => {});
-        startAmplitudeLoop();
-
         const audioEl = document.createElement("audio");
         audioEl.autoplay = true;
+        // Muted until perceived pickup (triggerPickup, on dc "open" below)
+        // — the track/analyser wiring right below still happens immediately
+        // regardless, only the audible output is held back.
+        audioEl.muted = true;
         audioElRef.current = audioEl;
         pc.ontrack = (e) => {
           audioEl.srcObject = e.streams[0];
@@ -278,7 +447,18 @@ export function useRealtimeCall() {
         const dc = pc.createDataChannel("oai-events");
         dcRef.current = dc;
 
-        dc.addEventListener("open", () => setStatus("connected"));
+        dc.addEventListener("open", () => {
+          // Whichever is later: the real connection (right now) or the
+          // minimum ring duration — never sooner than the real thing is
+          // ready, per triggerPickup's own guard against firing twice.
+          const elapsed = performance.now() - ringStartTimeRef.current;
+          const remaining = RING_MIN_DURATION_MS - elapsed;
+          if (remaining <= 0) {
+            triggerPickup();
+          } else {
+            pickupTimeoutRef.current = setTimeout(triggerPickup, remaining);
+          }
+        });
 
         dc.addEventListener("message", (e) => {
           let event: RealtimeServerEvent;
@@ -353,14 +533,14 @@ export function useRealtimeCall() {
         console.error("Failed to start realtime call", err);
         setError(err instanceof Error ? err.message : "Something went wrong starting the call.");
         setStatus("error");
-        cleanup();
+        void cleanup();
       }
     },
-    [cleanup, startAmplitudeLoop, startCountdown]
+    [cleanup, startAmplitudeLoop, startCountdown, startRingTone, triggerPickup]
   );
 
-  const stop = useCallback(() => {
-    cleanup();
+  const stop = useCallback(async () => {
+    await cleanup();
     setStatus((prev) => (prev === "idle" ? prev : "ended"));
     setSpeaking(false);
   }, [cleanup]);

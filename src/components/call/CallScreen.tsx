@@ -119,8 +119,12 @@ export function CallScreen({
     if (!timedOut || endedRef.current || !callId) return;
     endedRef.current = true;
     const durationSeconds = Math.round((Date.now() - (callStartRef.current ?? Date.now())) / 1000);
-    stop();
-    onEnd(transcript, durationSeconds, callId, "timeout");
+    // Awaited so the disconnect tone (played inside stop()'s cleanup) has
+    // time to finish before onEnd() transitions away from this screen.
+    void (async () => {
+      await stop();
+      onEnd(transcript, durationSeconds, callId, "timeout");
+    })();
     // transcript/onEnd change every render as new deltas arrive — only re-run this when timedOut flips.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timedOut, callId]);
@@ -133,11 +137,13 @@ export function CallScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entitlementExhausted]);
 
-  function handleEndCall() {
+  async function handleEndCall() {
     if (endedRef.current || !callId) return;
     endedRef.current = true;
     const durationSeconds = Math.round((Date.now() - (callStartRef.current ?? Date.now())) / 1000);
-    stop();
+    // Awaited so the disconnect tone (played inside stop()'s cleanup) has
+    // time to finish before onEnd() transitions away from this screen.
+    await stop();
     onEnd(transcript, durationSeconds, callId, "completed");
   }
 
