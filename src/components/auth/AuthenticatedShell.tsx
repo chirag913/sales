@@ -61,9 +61,27 @@ const NAV_LINKS = [
 // standalone icon button so it stays reachable at every width (this
 // renders with no `hidden`/`sm:` breakpoint), while the existing mobile-only
 // History/Profile icon shortcuts below it are untouched.
-function UserMenu({ label, onSignOut }: { label: string; onSignOut: () => void }) {
+function UserMenu({
+  label,
+  entitlement,
+  onEntitlementChange,
+  onSignOut,
+}: {
+  label: string;
+  entitlement: EntitlementStatus | null;
+  onEntitlementChange: (data: EntitlementStatus) => void;
+  onSignOut: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Same source of truth and same isAdmin/isTeamMember gating as the
+  // desktop pills below (AuthenticatedShell) — this exists because those
+  // pills are `sm:hidden`-gone below the sm breakpoint with no other way to
+  // reach balance/top-up on mobile, not because the desktop treatment
+  // needed changing.
+  const balanceText = entitlement && !entitlement.isAdmin ? usageBadgeText(entitlement) : null;
+  const showTopUp = Boolean(entitlement) && !entitlement?.isTeamMember;
 
   useEffect(() => {
     function handlePointerDown(e: MouseEvent) {
@@ -95,6 +113,23 @@ function UserMenu({ label, onSignOut }: { label: string; onSignOut: () => void }
           <p className="truncate border-b border-zinc-100 px-3 pb-2 text-xs text-zinc-400 dark:border-zinc-900 dark:text-zinc-500">
             {label}
           </p>
+
+          {(balanceText || showTopUp) && (
+            <div className="border-b border-zinc-100 py-1 dark:border-zinc-900 sm:hidden">
+              {balanceText && (
+                <p className="px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-300">{balanceText}</p>
+              )}
+              {showTopUp && (
+                <BuyCreditsButton
+                  variant="link"
+                  label="Top up"
+                  className="block w-full px-3 py-1.5 text-left text-sm font-medium text-emerald-600 dark:text-emerald-400"
+                  onSuccess={() => void fetchEntitlement().then((data) => data && onEntitlementChange(data))}
+                />
+              )}
+            </div>
+          )}
+
           <Link
             href="/profile"
             role="menuitem"
@@ -213,7 +248,14 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
                 onSuccess={() => void fetchEntitlement().then((data) => data && setEntitlement(data))}
               />
             )}
-            {accountLabel && <UserMenu label={accountLabel} onSignOut={() => void handleSignOut()} />}
+            {accountLabel && (
+              <UserMenu
+                label={accountLabel}
+                entitlement={entitlement}
+                onEntitlementChange={setEntitlement}
+                onSignOut={() => void handleSignOut()}
+              />
+            )}
             <Link
               href="/history"
               aria-label="Call history"
