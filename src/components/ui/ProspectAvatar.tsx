@@ -3,14 +3,34 @@
 import { RefObject, useEffect, useId, useRef, useState } from "react";
 import { ProspectIdentity } from "@/lib/types";
 
-// Real headshot pools, one per gender — the primary visual. Indexed by the
-// same deterministic hash as AVATAR_PALETTES below (hashString(fullName)),
-// so a given persona always resolves to the same photo everywhere
-// ProspectAvatar is used (ScenarioPicker, ReadyToCall, CallVisual,
-// CallResultDetail, CallHistoryList, CallScreen all render the same
-// identity object, so they naturally stay in sync).
+// Real headshot pools, one per gender (plus an India-specific tier below)
+// — the primary visual. Indexed by the same deterministic hash as
+// AVATAR_PALETTES below (hashString(fullName)), so a given persona always
+// resolves to the same photo everywhere ProspectAvatar is used
+// (ScenarioPicker, ReadyToCall, CallVisual, CallResultDetail,
+// CallHistoryList, CallScreen all render the same identity object, so they
+// naturally stay in sync).
 const MALE_AVATAR_PHOTOS = ["/avatars/male/m1.png", "/avatars/male/m2.png", "/avatars/male/m3.png", "/avatars/male/m4.png"];
 const FEMALE_AVATAR_PHOTOS = ["/avatars/female/f1.png", "/avatars/female/f2.png", "/avatars/female/f3.png", "/avatars/female/f4.png"];
+
+// India-specific tier, checked first for identity.market === "India" so
+// those personas draw from Indian-presenting headshots instead of the
+// general pool. Falls back to the general pool above (via photoPool's
+// selection below) if a gender's India-specific array is ever empty —
+// same graceful-degradation principle as the photo-load failure handling
+// further down, just one layer earlier.
+const INDIA_MALE_AVATAR_PHOTOS = [
+  "/avatars/india/male/india-m1.png",
+  "/avatars/india/male/india-m2.png",
+  "/avatars/india/male/india-m3.png",
+  "/avatars/india/male/india-m4.png",
+];
+const INDIA_FEMALE_AVATAR_PHOTOS = [
+  "/avatars/india/female/india-f1.png",
+  "/avatars/india/female/india-f2.png",
+  "/avatars/india/female/india-f3.png",
+  "/avatars/india/female/india-f4.png",
+];
 
 // Soft, low-saturation gradient pairs — avatar background variety without
 // expanding the app's actual accent-color language (still just muted zinc-
@@ -43,7 +63,7 @@ const SIZE_PX: Record<"sm" | "md" | "lg" | "xl", number> = {
 };
 
 interface ProspectAvatarProps {
-  identity: Pick<ProspectIdentity, "fullName" | "gender">;
+  identity: Pick<ProspectIdentity, "fullName" | "gender" | "market">;
   size?: "sm" | "md" | "lg" | "xl";
   active?: boolean;
   amplitudeRef?: RefObject<number>;
@@ -59,7 +79,9 @@ export function ProspectAvatar({ identity, size = "md", active = false, amplitud
   const skew = ((hash % 7) - 3) * 0.6; // small deterministic jitter, purely cosmetic variety
   const px = SIZE_PX[size];
 
-  const photoPool = identity.gender === "female" ? FEMALE_AVATAR_PHOTOS : MALE_AVATAR_PHOTOS;
+  const generalPool = identity.gender === "female" ? FEMALE_AVATAR_PHOTOS : MALE_AVATAR_PHOTOS;
+  const indiaPool = identity.gender === "female" ? INDIA_FEMALE_AVATAR_PHOTOS : INDIA_MALE_AVATAR_PHOTOS;
+  const photoPool = identity.market === "India" && indiaPool.length > 0 ? indiaPool : generalPool;
   const photoSrc = photoPool[hash % photoPool.length];
   const [photoFailed, setPhotoFailed] = useState(false);
   // Reset the failure flag when the resolved photo actually changes

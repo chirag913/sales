@@ -156,5 +156,6 @@ export function generateProspectIdentity(
     title,
     company,
     gender,
+    market,
   };
 }

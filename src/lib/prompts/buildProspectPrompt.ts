@@ -1,5 +1,16 @@
 import { buildCompanyContext } from "@/lib/prompts/companyContext";
-import { CallType, ProspectIdentity, SalesProfile, Scenario, TrainingProfile } from "@/lib/types";
+import { CallType, getProspectLanguage, ProspectIdentity, SalesProfile, Scenario, TrainingProfile } from "@/lib/types";
+
+// Standing, whole-call enforcement — not a passing mention — for markets
+// whose prospects don't speak plain English. Currently just India
+// (Hinglish); every other market gets an empty string here, so the
+// existing English-only prompt is completely unaffected below.
+const LANGUAGE_SECTIONS: Record<"hinglish", string> = {
+  hinglish: `
+## LANGUAGE
+You MUST speak only in Hinglish (natural code-switching between Hindi and English within sentences, the way people actually speak it) for this ENTIRE conversation, from your first word to your last. Even if the caller speaks to you in pure English or asks you to switch, continue responding in Hinglish — do not switch to pure English at any point in the call.
+`,
+};
 
 export function buildProspectPrompt(
   salesProfile: SalesProfile,
@@ -7,6 +18,9 @@ export function buildProspectPrompt(
   scenario: Scenario,
   identity: ProspectIdentity
 ): string {
+  const language = getProspectLanguage(trainingProfile.market);
+  const languageSection = language === "hinglish" ? LANGUAGE_SECTIONS.hinglish : "";
+
   const { offerLines, factLines } = buildCompanyContext(salesProfile, trainingProfile);
 
   // Defaults to "cold" for a profile saved before this field existed —
@@ -33,7 +47,7 @@ You are ONLY the prospect, for the entire call. The caller is the salesperson.
 - NEVER say "we help...", "we offer...", or "our service..." to describe anything except your own actual business (${identity.company}), even if you're just trying to reflect back what they said.
 - If you're unsure what to say, default to a short reaction ("okay", "gotcha", "how does that work?") instead of restating their pitch in your own words.
 - You are not an assistant helping the caller explain their own offer, and you are not a second voice for their company. You only react to what they say from your own side of the call.
-
+${languageSection}
 ## How you answer the phone (this is your very first line — read this before anything else below)
 You do not yet know who is calling or why, and you have not recognized this as a sales call. Answer the way a real person answers an unrecognized number: brief, neutral, slightly guarded, unhurried — e.g. "Hello?", "Hello, this is ${identity.firstName}", or "Yeah, who's this?". Keep it to a few words. Do not mention any product, company, industry, objection, or skepticism in this first line, and do not sound busy, annoyed, defensive, or fast-paced yet — you have no reason to be, since you don't know why you're being called.
 

@@ -5,7 +5,7 @@ export const OBJECTION_TYPES = [
   "PRICE",
   "TRUST",
   "LOCATION",
-  "US OFFICE",
+  "NO LOCAL PRESENCE",
   "CREDIBILITY",
   "COMPETITOR",
   "NO NEED",

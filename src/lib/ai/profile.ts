@@ -52,75 +52,93 @@ Rules:
   - warm: further-along objections — stalling, needing internal buy-in, timing, or reconsidering
     something already partly discussed.`;
 
-const trainingProfileSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    market: { type: "string", enum: ["US", "UK", "Canada", "Australia", "Other"] },
-    service: { type: "string" },
-    icpTitles: { type: "array", items: { type: "string" } },
-    companySizeRange: { type: "string" },
-    additionalCriteria: { type: "array", items: { type: "string" } },
-    painPoints: { type: "array", items: { type: "string" } },
-    likelyObjections: { type: "array", items: { type: "string" } },
-    salesObjective: {
-      type: "string",
-      enum: ["book_meeting", "book_demo", "qualify_prospect", "make_sale"],
-    },
-    salesObjectiveDetail: { type: "string" },
-    typicalProspect: { type: "string" },
-    callType: { type: "string", enum: ["cold", "cold_after_outreach", "warm"] },
-    // Always present (OpenAI strict mode requires every property to be
-    // required) — empty string when callType is "cold", same convention as
-    // additionalCriteria being an empty array when nothing else applies.
-    priorContextDetail: { type: "string" },
-    assumptions: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        market: { type: "boolean" },
-        service: { type: "boolean" },
-        icpTitles: { type: "boolean" },
-        companySizeRange: { type: "boolean" },
-        additionalCriteria: { type: "boolean" },
-        painPoints: { type: "boolean" },
-        likelyObjections: { type: "boolean" },
-        salesObjective: { type: "boolean" },
-        typicalProspect: { type: "boolean" },
-        callType: { type: "boolean" },
-        priorContextDetail: { type: "boolean" },
+// Two different enums for the same "market" field, depending on the job:
+// - generate (buildTrainingProfileSchema(GENERATE_MARKETS)) only ever needs
+//   to produce what HeroInput actually offers — US/India/Other.
+// - refine (buildTrainingProfileSchema(ALL_MARKETS)) has to be able to echo
+//   back an EXISTING profile's market untouched when the instruction isn't
+//   about market at all, including a UK/Canada/Australia value saved before
+//   those were dropped from the selector (see the ProspectMarket comment in
+//   types.ts) — OpenAI's strict JSON mode refuses to emit any value outside
+//   the enum, so reusing the narrow, generate-only enum here would silently
+//   coerce a returning user's stored market on every unrelated refine call.
+const GENERATE_MARKETS = ["US", "India", "Other"] as const;
+const ALL_MARKETS = ["US", "UK", "Canada", "Australia", "India", "Other"] as const;
+
+function buildTrainingProfileSchema(marketEnum: readonly string[]) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      market: { type: "string", enum: marketEnum },
+      service: { type: "string" },
+      icpTitles: { type: "array", items: { type: "string" } },
+      companySizeRange: { type: "string" },
+      additionalCriteria: { type: "array", items: { type: "string" } },
+      painPoints: { type: "array", items: { type: "string" } },
+      likelyObjections: { type: "array", items: { type: "string" } },
+      salesObjective: {
+        type: "string",
+        enum: ["book_meeting", "book_demo", "qualify_prospect", "make_sale"],
       },
-      required: [
-        "market",
-        "service",
-        "icpTitles",
-        "companySizeRange",
-        "additionalCriteria",
-        "painPoints",
-        "likelyObjections",
-        "salesObjective",
-        "typicalProspect",
-        "callType",
-        "priorContextDetail",
-      ],
+      salesObjectiveDetail: { type: "string" },
+      typicalProspect: { type: "string" },
+      callType: { type: "string", enum: ["cold", "cold_after_outreach", "warm"] },
+      // Always present (OpenAI strict mode requires every property to be
+      // required) — empty string when callType is "cold", same convention as
+      // additionalCriteria being an empty array when nothing else applies.
+      priorContextDetail: { type: "string" },
+      assumptions: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          market: { type: "boolean" },
+          service: { type: "boolean" },
+          icpTitles: { type: "boolean" },
+          companySizeRange: { type: "boolean" },
+          additionalCriteria: { type: "boolean" },
+          painPoints: { type: "boolean" },
+          likelyObjections: { type: "boolean" },
+          salesObjective: { type: "boolean" },
+          typicalProspect: { type: "boolean" },
+          callType: { type: "boolean" },
+          priorContextDetail: { type: "boolean" },
+        },
+        required: [
+          "market",
+          "service",
+          "icpTitles",
+          "companySizeRange",
+          "additionalCriteria",
+          "painPoints",
+          "likelyObjections",
+          "salesObjective",
+          "typicalProspect",
+          "callType",
+          "priorContextDetail",
+        ],
+      },
     },
-  },
-  required: [
-    "market",
-    "service",
-    "icpTitles",
-    "companySizeRange",
-    "additionalCriteria",
-    "painPoints",
-    "likelyObjections",
-    "salesObjective",
-    "salesObjectiveDetail",
-    "typicalProspect",
-    "callType",
-    "priorContextDetail",
-    "assumptions",
-  ],
-} as const;
+    required: [
+      "market",
+      "service",
+      "icpTitles",
+      "companySizeRange",
+      "additionalCriteria",
+      "painPoints",
+      "likelyObjections",
+      "salesObjective",
+      "salesObjectiveDetail",
+      "typicalProspect",
+      "callType",
+      "priorContextDetail",
+      "assumptions",
+    ],
+  } as const;
+}
+
+const trainingProfileSchema = buildTrainingProfileSchema(GENERATE_MARKETS);
+const refineTrainingProfileSchema = buildTrainingProfileSchema(ALL_MARKETS);
 
 export interface GenerateTrainingProfileInput {
   description: string;
@@ -207,7 +225,7 @@ export async function refineTrainingProfile(
       json_schema: {
         name: "training_profile",
         strict: true,
-        schema: trainingProfileSchema,
+        schema: refineTrainingProfileSchema,
       },
     },
   });
