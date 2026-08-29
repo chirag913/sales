@@ -36,6 +36,7 @@ const MARKET_LABEL: Record<string, string> = {
   UK: "🇬🇧 United Kingdom",
   Canada: "🇨🇦 Canada",
   Australia: "🇦🇺 Australia",
+  India: "🇮🇳 India",
   Other: "🌍 Other",
 };
 
@@ -363,6 +364,16 @@ export function ProfileReview({
                         {opt.label}
                       </option>
                     ))}
+                    {/* A returning user's profile can still have a market
+                        (UK/Canada/Australia) that's no longer offered above —
+                        surface it as a selectable option rather than letting
+                        the select silently show nothing selected. Disappears
+                        on its own once they pick one of the current options. */}
+                    {!PROSPECT_MARKET_OPTIONS.some((opt) => opt.value === (draft.market ?? profile.market)) && (
+                      <option value={draft.market ?? profile.market}>
+                        {MARKET_LABEL[draft.market ?? profile.market] ?? (draft.market ?? profile.market)}
+                      </option>
+                    )}
                   </select>
                   <EditActions
                     onSave={() => saveEdit({ market: draft.market ?? profile.market }, ["market"])}

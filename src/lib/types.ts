@@ -55,14 +55,16 @@ export interface SalesProfile {
   };
 }
 
-export type ProspectMarket = "US" | "UK" | "Canada" | "Australia" | "Other";
+// UK/Canada/Australia stay in the type (not just their name lists in
+// identity.ts) so a returning user's already-stored profile.market keeps
+// resolving exactly as before — real per-market names, no fallback needed.
+// They're just not offered in PROSPECT_MARKET_OPTIONS below anymore.
+export type ProspectMarket = "US" | "UK" | "Canada" | "Australia" | "India" | "Other";
 
-export const PROSPECT_MARKET_OPTIONS: { value: ProspectMarket; label: string }[] = [
-  { value: "US", label: "United States" },
-  { value: "UK", label: "United Kingdom" },
-  { value: "Canada", label: "Canada" },
-  { value: "Australia", label: "Australia" },
-  { value: "Other", label: "Other" },
+export const PROSPECT_MARKET_OPTIONS: { value: ProspectMarket; label: string; flag: string }[] = [
+  { value: "US", label: "United States", flag: "🇺🇸" },
+  { value: "India", label: "India", flag: "🇮🇳" },
+  { value: "Other", label: "Other", flag: "🌐" },
 ];
 
 export type CallType = "cold" | "cold_after_outreach" | "warm";

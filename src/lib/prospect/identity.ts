@@ -17,6 +17,10 @@ const FIRST_NAMES_MALE_BY_MARKET: Record<ProspectMarket, string[]> = {
     "Jack", "Oliver", "William", "Noah", "Thomas", "James", "Lucas", "Henry",
     "Ethan", "Cooper", "Mason", "Archie", "Leo", "Hunter", "Charlie",
   ],
+  India: [
+    "Arjun", "Rohan", "Vikram", "Aditya", "Rahul", "Karan", "Amit", "Sanjay",
+    "Nikhil", "Varun", "Siddharth", "Rajesh", "Anand", "Vivek", "Arun",
+  ],
   Other: [
     "Alex", "Taylor", "Casey", "Sam", "Drew", "Quinn", "Rowan", "Dana",
     "Emerson", "Peyton",
@@ -40,6 +44,10 @@ const FIRST_NAMES_FEMALE_BY_MARKET: Record<ProspectMarket, string[]> = {
     "Charlotte", "Olivia", "Amelia", "Isla", "Mia", "Grace", "Ava", "Willow",
     "Chloe", "Ivy", "Matilda", "Ruby", "Zoe", "Sophie", "Evie",
   ],
+  India: [
+    "Ananya", "Neha", "Divya", "Pooja", "Kavita", "Shreya", "Meera", "Aditi",
+    "Nisha", "Riya", "Sneha", "Anjali", "Kritika", "Isha", "Priya",
+  ],
   // Jordan/Morgan/Riley/Kai/Blake were dropped — genuinely unisex, but skew
   // male-leaning enough in most readers' ears that they felt mismatched
   // even when correctly assigned female. Replaced with names that read more
@@ -57,6 +65,15 @@ const LAST_NAMES = [
   "Jackson", "Martin", "Lee", "Thompson", "White", "Harris", "Clark", "Lewis",
   "Robinson", "Walker", "Young", "Allen", "King", "Wright", "Scott", "Green",
   "Baker", "Nelson", "Carter", "Mitchell", "Roberts", "Turner", "Phillips", "Campbell",
+];
+
+// India gets its own surname pool rather than pairing an Indian first name
+// with e.g. "Johnson" — every other market already shares LAST_NAMES above,
+// but that reads as a real oversight specifically for India given the
+// first-name accuracy this file otherwise goes to the trouble of providing.
+const INDIAN_LAST_NAMES = [
+  "Sharma", "Verma", "Gupta", "Patel", "Nair", "Iyer", "Reddy", "Rao",
+  "Mehta", "Kapoor", "Malhotra", "Chopra", "Bhatt", "Joshi", "Desai",
 ];
 
 const COMPANY_PREFIXES = [
@@ -127,7 +144,7 @@ export function generateProspectIdentity(
     (gender === "male" ? FIRST_NAMES_MALE_BY_MARKET[market] : FIRST_NAMES_FEMALE_BY_MARKET[market]) ??
     (gender === "male" ? FIRST_NAMES_MALE_BY_MARKET.Other : FIRST_NAMES_FEMALE_BY_MARKET.Other);
   const firstName = pickRandom(firstNames);
-  const lastName = pickRandom(LAST_NAMES);
+  const lastName = pickRandom(market === "India" ? INDIAN_LAST_NAMES : LAST_NAMES);
   const industryWord =
     extractIndustryWordFromService(service) ?? extractIndustryWord(title) ?? pickRandom(GENERIC_INDUSTRY_WORDS);
   const company = `${pickRandom(COMPANY_PREFIXES)} ${industryWord} ${pickRandom(COMPANY_SUFFIXES)}`;

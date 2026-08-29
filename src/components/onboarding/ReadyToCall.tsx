@@ -19,6 +19,7 @@ const MARKET_LABEL: Record<string, string> = {
   UK: "🇬🇧 United Kingdom",
   Canada: "🇨🇦 Canada",
   Australia: "🇦🇺 Australia",
+  India: "🇮🇳 India",
   Other: "🌍 Other",
 };
 
