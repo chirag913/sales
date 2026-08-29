@@ -378,6 +378,7 @@ export function TrainingSetup() {
     return (
       <ScenarioPicker
         scenarios={scenarios}
+        profile={profile}
         onSelect={(scenario) => void handleSelectScenario(scenario)}
         onBack={() => setStep("review")}
         voicePreference={voicePreference}

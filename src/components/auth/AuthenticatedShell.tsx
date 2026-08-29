@@ -1,10 +1,11 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { History, LogOut, User } from "lucide-react";
+import { ChevronDown, History, User } from "lucide-react";
 import { BuyCreditsButton } from "@/components/onboarding/BuyCreditsButton";
+import { InitialsAvatar } from "@/components/ui/InitialsAvatar";
 import { Logo } from "@/components/ui/Logo";
 import { EntitlementStatus } from "@/lib/entitlement/types";
 import { createClient } from "@/lib/supabase/client";
@@ -56,10 +57,87 @@ const NAV_LINKS = [
   { href: "/profile", label: "Profile" },
 ];
 
+// The avatar/dropdown trigger plus its menu — sign-out moved here from a
+// standalone icon button so it stays reachable at every width (this
+// renders with no `hidden`/`sm:` breakpoint), while the existing mobile-only
+// History/Profile icon shortcuts below it are untouched.
+function UserMenu({ label, onSignOut }: { label: string; onSignOut: () => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handlePointerDown(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Account menu"
+        className="flex items-center gap-1 rounded-full py-1 pl-1 pr-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 dark:text-zinc-500 dark:hover:bg-zinc-900"
+      >
+        <InitialsAvatar label={label} size="sm" />
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="shadow-premium absolute right-0 top-full z-10 mt-2 w-52 rounded-xl border border-zinc-200/70 bg-white py-1.5 dark:border-zinc-800 dark:bg-zinc-950"
+        >
+          <p className="truncate border-b border-zinc-100 px-3 pb-2 text-xs text-zinc-400 dark:border-zinc-900 dark:text-zinc-500">
+            {label}
+          </p>
+          <Link
+            href="/profile"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="block px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          >
+            Profile &amp; settings
+          </Link>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onSignOut();
+            }}
+            className="block w-full px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          >
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AuthenticatedShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [entitlement, setEntitlement] = useState<EntitlementStatus | null>(null);
+  const [accountLabel, setAccountLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+    void supabase.auth.getUser().then(({ data }) => {
+      if (cancelled || !data.user) return;
+      const fullName = data.user.user_metadata?.full_name;
+      setAccountLabel(typeof fullName === "string" && fullName.trim() ? fullName.trim() : (data.user.email ?? "Account"));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,9 +192,9 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
             </nav>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {entitlement && !entitlement.isAdmin && (
-              <span className="hidden rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 sm:inline-block">
+              <span className="hidden rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 sm:inline-flex sm:items-center">
                 {usageBadgeText(entitlement)}
               </span>
             )}
@@ -126,20 +204,16 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
               // Hidden for team members: reserve_call_entitlement never consults
               // a team member's personal credits_balance, so a purchase here
               // would strand real money on a balance that can never be spent.
+              // Same pill treatment/breakpoint as the balance badge above —
+              // neither is muted or hidden based on remaining balance.
               <BuyCreditsButton
                 variant="link"
-                className="text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                label="Top up"
+                className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300 sm:inline-flex sm:items-center"
                 onSuccess={() => void fetchEntitlement().then((data) => data && setEntitlement(data))}
               />
             )}
-            <button
-              type="button"
-              onClick={handleSignOut}
-              aria-label="Sign out"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
-            >
-              <LogOut className="h-4 w-4" aria-hidden />
-            </button>
+            {accountLabel && <UserMenu label={accountLabel} onSignOut={() => void handleSignOut()} />}
             <Link
               href="/history"
               aria-label="Call history"

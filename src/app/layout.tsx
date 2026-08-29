@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cold Call Trainer",
-  description: "Practice cold calls against a realistic AI prospect and track your improvement.",
+  title: "bettercallz — Practice cold calls before the real ones",
+  description:
+    "Tell us who you're calling, then talk to a realistic AI prospect that argues back and get coached on exactly what to fix.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

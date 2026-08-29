@@ -1,12 +1,16 @@
 "use client";
 
-import { Dice5 } from "lucide-react";
+import { ComponentType, useMemo } from "react";
+import { Briefcase, Building2, ChevronRight, Dice5, PhoneCall, UserRound, Users } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { ProspectGenderPreference } from "@/lib/prospect/identity";
-import { Scenario } from "@/lib/types";
+import { AVATAR_PALETTES, hashString, ProspectAvatar } from "@/components/ui/ProspectAvatar";
+import { generateProspectIdentity, ProspectGenderPreference } from "@/lib/prospect/identity";
+import { ProspectIdentity, Scenario, TrainingProfile } from "@/lib/types";
 
 interface ScenarioPickerProps {
   scenarios: Scenario[];
+  profile: TrainingProfile;
   onSelect: (scenario: Scenario) => void;
   onBack: () => void;
   voicePreference: ProspectGenderPreference;
@@ -33,44 +37,68 @@ const DIFFICULTY_ICON: Record<Scenario["difficulty"], string> = {
   Expert: "●",
 };
 
+// Role-icon circles in the "More challenges" grid deliberately reuse the
+// SAME muted palette ProspectAvatar already uses for persona portraits
+// (AVATAR_PALETTES) rather than inventing a new accent-color set — these
+// cards represent personas, so the color language should match. Icon choice
+// and color are both hashed off the scenario id: stable across re-renders,
+// varied for visual interest, but not encoding difficulty (that's the
+// separate pill).
+const ROLE_ICONS: ComponentType<{ className?: string }>[] = [Briefcase, Building2, UserRound, Users];
+
 const VOICE_PREFERENCE_OPTIONS: { value: ProspectGenderPreference; label: string }[] = [
   { value: "any", label: "Any voice" },
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
 ];
 
-// Safety net, not the primary fix (that's the SYSTEM_PROMPT wording in
-// src/lib/ai/scenarios.ts) — occasionally the model still degenerates an
-// objective into something label-like ("book_demo", "qualifyprospect")
-// instead of a natural sentence. Only touches text that actually looks like
-// a slug: underscores/hyphens with no spaces at all, or a single bare
-// lowercase run — never a real sentence, which always has spaces and/or
-// punctuation (so "follow-up call" is left alone: it has a space).
-function isSlugLike(text: string): boolean {
-  const trimmed = text.trim();
-  if (!trimmed) return false;
-  const hasSeparatorWithNoSpaces = /[_-]/.test(trimmed) && !/\s/.test(trimmed);
-  const isBareLowercaseWord = /^[a-z]+$/.test(trimmed);
-  return hasSeparatorWithNoSpaces || isBareLowercaseWord;
+function expectText(scenario: Scenario): string {
+  // Defensive fallback for scenario batches persisted before whatToExpect
+  // existed (see lib/types.ts) — freshly generated scenarios always have
+  // this field, so this text should never actually appear in practice.
+  return scenario.whatToExpect || "No behavior preview available — regenerate scenarios to get one.";
 }
 
-function humanize(text: string): string {
-  if (!isSlugLike(text)) return text;
-  return text
-    .replace(/[_-]+/g, " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+function RoleIcon({ scenarioId }: { scenarioId: string }) {
+  const hash = hashString(scenarioId);
+  const [from, to] = AVATAR_PALETTES[hash % AVATAR_PALETTES.length];
+  const Icon = ROLE_ICONS[hash % ROLE_ICONS.length];
+  return (
+    <span
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-700"
+      style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
+      aria-hidden
+    >
+      <Icon className="h-5 w-5" />
+    </span>
+  );
 }
 
 export function ScenarioPicker({
   scenarios,
+  profile,
   onSelect,
   onBack,
   voicePreference,
   onVoicePreferenceChange,
 }: ScenarioPickerProps) {
+  const identities = useMemo(() => {
+    const map = new Map<string, ProspectIdentity>();
+    for (const scenario of scenarios) {
+      map.set(scenario.id, generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
+    }
+    return map;
+  }, [scenarios, profile.market, profile.icpTitles, profile.service, voicePreference]);
+
+  const featured = scenarios.find((s) => s.difficulty === "Easy") ?? scenarios[0];
+  const rest = featured ? scenarios.filter((s) => s.id !== featured.id) : scenarios;
+  const featuredIdentity = featured ? identities.get(featured.id) : undefined;
+
+  const icpSummary =
+    profile.icpTitles.length > 0
+      ? profile.icpTitles.slice(0, 3).join(", ") + (profile.icpTitles.length > 3 ? "…" : "")
+      : "Any role";
+
   function handleRandomSelect() {
     if (scenarios.length === 0) return;
     const randomScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
@@ -78,76 +106,149 @@ export function ScenarioPicker({
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-6 py-16">
-      <button
-        type="button"
-        onClick={onBack}
-        className="text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
-      >
-        ← Edit setup
-      </button>
-
-      <div className="mb-8 mt-4 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Choose your challenge.</h1>
-        <p className="mt-2 text-zinc-500 dark:text-zinc-400">Pick a scenario to start practicing.</p>
-      </div>
-
-      <div className="mb-8 flex flex-col items-center gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-          Prospect voice
-        </span>
-        <div className="flex items-center gap-2">
-          {VOICE_PREFERENCE_OPTIONS.map((option) => (
-            <Chip
-              key={option.value}
-              selected={voicePreference === option.value}
-              onClick={() => onVoicePreferenceChange(option.value)}
-            >
-              {option.label}
-            </Chip>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {scenarios.map((scenario) => (
-          <button
-            key={scenario.id}
-            type="button"
-            onClick={() => onSelect(scenario)}
-            className="flex flex-col items-start gap-3 rounded-2xl border border-zinc-200/70 bg-white p-5 text-left shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950"
-          >
-            <div className="flex w-full items-center justify-between gap-2">
-              <span className="flex items-center gap-3">
-                <span
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base ${DIFFICULTY_STYLE[scenario.difficulty]}`}
-                  aria-hidden
-                >
-                  {DIFFICULTY_ICON[scenario.difficulty]}
-                </span>
-                <span className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{scenario.name}</span>
-              </span>
-              <span
-                className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${DIFFICULTY_STYLE[scenario.difficulty]}`}
-              >
-                {scenario.difficulty}
-              </span>
-            </div>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">{scenario.description}</p>
-            <Chip>{humanize(scenario.objective)}</Chip>
-          </button>
-        ))}
-
+    <div className="mx-auto w-full max-w-4xl px-6 py-16">
+      <div className="flex items-center justify-between gap-4">
         <button
           type="button"
-          onClick={handleRandomSelect}
-          className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-zinc-300 bg-transparent p-5 text-center text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
+          onClick={onBack}
+          className="text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
         >
-          <Dice5 className="h-6 w-6" aria-hidden />
-          <span className="text-base font-semibold">Random</span>
-          <span className="text-sm">Let it pick your challenge</span>
+          ← Edit setup
+        </button>
+        <Chip tone="positive">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400" aria-hidden />
+            AI prospect ready
+          </span>
+        </Chip>
+      </div>
+
+      <div className="mt-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-emerald-600 dark:text-emerald-400">
+          Practice session
+        </p>
+        <h1 className="mt-2 text-4xl font-bold uppercase tracking-tight text-zinc-900 dark:text-zinc-50">
+          Pick your prospect.
+        </h1>
+        <p className="mt-2 text-zinc-500 dark:text-zinc-400">Choose who you want to practice on next.</p>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/50 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <PhoneCall className="h-4 w-4 shrink-0 text-zinc-400 dark:text-zinc-500" aria-hidden />
+          <p className="min-w-0 truncate text-sm text-zinc-600 dark:text-zinc-400">
+            <span className="font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Calling</span>{" "}
+            <span className="text-zinc-900 dark:text-zinc-50">{profile.service}</span> · {icpSummary}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="shrink-0 self-start text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400 sm:self-auto"
+        >
+          View setup →
         </button>
       </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Voice</span>
+        {VOICE_PREFERENCE_OPTIONS.map((option) => (
+          <Chip
+            key={option.value}
+            selected={voicePreference === option.value}
+            onClick={() => onVoicePreferenceChange(option.value)}
+          >
+            {option.label}
+          </Chip>
+        ))}
+      </div>
+
+      {featured && (
+        <div className="mt-10">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+            Recommended for you
+          </p>
+          <div className="mt-3 rounded-3xl border-2 border-emerald-200 bg-white p-6 shadow-sm dark:border-emerald-900/50 dark:bg-zinc-950 sm:p-8">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+              {featuredIdentity && (
+                <div className="flex shrink-0 flex-col items-center text-center sm:items-start sm:text-left">
+                  <ProspectAvatar identity={featuredIdentity} size="lg" />
+                  <p className="mt-3 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    {featuredIdentity.fullName}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {featuredIdentity.title} · {featuredIdentity.company}
+                  </p>
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{featured.name}</h2>
+                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${DIFFICULTY_STYLE[featured.difficulty]}`}>
+                    {featured.difficulty}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{featured.description}</p>
+                <div className="mt-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                    What to expect
+                  </p>
+                  <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{expectText(featured)}</p>
+                </div>
+                <Button onClick={() => onSelect(featured)} className="mt-5 gap-2 px-6 py-3 text-base">
+                  Start practice
+                  <span aria-hidden>→</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {rest.length > 0 && (
+        <div className="mt-10">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+            More challenges
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {rest.map((scenario) => (
+              <button
+                key={scenario.id}
+                type="button"
+                onClick={() => onSelect(scenario)}
+                className="flex items-start gap-3 rounded-2xl border border-zinc-200/70 bg-white p-5 text-left shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <RoleIcon scenarioId={scenario.id} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{scenario.name}</span>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${DIFFICULTY_STYLE[scenario.difficulty]}`}>
+                      <span className="mr-1" aria-hidden>
+                        {DIFFICULTY_ICON[scenario.difficulty]}
+                      </span>
+                      {scenario.difficulty}
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">{scenario.description}</p>
+                  <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
+                    <span className="font-medium uppercase tracking-wide">What to expect</span> {expectText(scenario)}
+                  </p>
+                </div>
+                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-zinc-300 dark:text-zinc-700" aria-hidden />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={handleRandomSelect}
+        className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-zinc-300 bg-transparent px-5 py-4 text-sm font-medium text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
+      >
+        <Dice5 className="h-4 w-4" aria-hidden />
+        Surprise me — random prospect
+      </button>
     </div>
   );
 }

@@ -125,6 +125,10 @@ export interface Scenario {
   description: string;
   difficulty: ScenarioDifficulty;
   objective: string;
+  // How the prospect actually behaves during this specific call (pacing,
+  // pushback, how much room they give the caller) — distinct from
+  // `description`'s general mindset/trait summary. See scenarios.ts.
+  whatToExpect: string;
 }
 
 export interface ProspectIdentity {

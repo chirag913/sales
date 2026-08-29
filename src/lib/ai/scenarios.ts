@@ -12,12 +12,18 @@ of difficulty.
 Rules:
 - Each scenario needs: a short evocative name (2-4 words, e.g. "Skeptical Office Manager"), a
   one-line description of the prospect's mindset/behavior, a difficulty of Easy/Medium/Hard/Expert,
-  and a recommended objective for that specific call (this can differ
-  from the profile's default objective when the scenario calls for it — e.g. a skeptical scenario
-  might recommend qualifying the prospect rather than going straight for a meeting). Write the
-  objective as a short natural sentence a person would actually say out loud — never a label,
-  slug, or snake_case phrase. For example: "Get them to agree to a 15-minute demo call" or "Find
-  out what's stopping them from switching providers," NOT "book_demo" or "qualify prospect."
+  a recommended objective for that specific call, and a "what to expect" line.
+- The description covers the prospect's general mindset/trait (who they are). The "what to expect"
+  line is different: a short, concrete sentence about how they'll actually behave during THIS call
+  — their pacing, tone, what they'll push back on, how much room they give you. For example, for a
+  cautious-but-open persona: "Gives you room to explain, but wants reassurance before considering a
+  change." Never repeat the description almost verbatim — it should add call-specific behavior the
+  description doesn't already say.
+- Write the objective as a short natural sentence a person would actually say out loud — never a
+  label, slug, or snake_case phrase. This can differ from the profile's default objective when the
+  scenario calls for it — e.g. a skeptical scenario might recommend qualifying the prospect rather
+  than going straight for a meeting. For example: "Get them to agree to a 15-minute demo call" or
+  "Find out what's stopping them from switching providers," NOT "book_demo" or "qualify prospect."
 - Base scenarios on the profile's actual pain points and likely objections — don't invent
   unrelated objections.
 - Cover a spread of difficulty: include at least one Easy scenario, one built around an
@@ -50,8 +56,9 @@ const scenariosSchema = {
           description: { type: "string" },
           difficulty: { type: "string", enum: ["Easy", "Medium", "Hard", "Expert"] },
           objective: { type: "string" },
+          whatToExpect: { type: "string" },
         },
-        required: ["name", "description", "difficulty", "objective"],
+        required: ["name", "description", "difficulty", "objective", "whatToExpect"],
       },
     },
   },
