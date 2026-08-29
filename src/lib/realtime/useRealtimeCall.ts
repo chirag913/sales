@@ -60,9 +60,9 @@ const RING_CYCLE_S = 1.5;
 // Perceived pickup (audible AI voice + status flipping to "connected") is
 // gated on whichever is later: this minimum, or the real connection
 // actually being ready — see triggerPickup and the dc "open" handler in
-// start(). Long enough to read as a natural ring, short enough not to feel
-// like a stall on a fast connection.
-const RING_MIN_DURATION_MS = 2500;
+// start(). 2s fits two full ring-ring bursts (RING_CYCLE_S below) and lands
+// in the trailing silence rather than cutting a beep off mid-play.
+const RING_MIN_DURATION_MS = 2000;
 
 // Disconnect tone on hangup — two short descending beeps, which reads as
 // "call ended" without imitating any specific carrier's tone.
