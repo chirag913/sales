@@ -1,16 +1,22 @@
 "use client";
 
-import { ComponentType, useMemo } from "react";
+import { ComponentType } from "react";
 import { Briefcase, Building2, ChevronRight, Dice5, PhoneCall, UserRound, Users } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { AVATAR_PALETTES, hashString, ProspectAvatar } from "@/components/ui/ProspectAvatar";
-import { generateProspectIdentity, ProspectGenderPreference } from "@/lib/prospect/identity";
+import { ProspectGenderPreference } from "@/lib/prospect/identity";
 import { ProspectIdentity, Scenario, TrainingProfile } from "@/lib/types";
 
 interface ScenarioPickerProps {
   scenarios: Scenario[];
   profile: TrainingProfile;
+  // One identity per scenario.id, generated once by TrainingSetup (the
+  // single source of truth) — NOT generated here, so the persona shown on
+  // this card is the exact same one that carries through to Ready/Call/
+  // Score when the scenario is selected, rather than a second, unrelated
+  // roll of the dice.
+  identities: Map<string, ProspectIdentity>;
   onSelect: (scenario: Scenario) => void;
   onBack: () => void;
   voicePreference: ProspectGenderPreference;
@@ -77,19 +83,12 @@ function RoleIcon({ scenarioId }: { scenarioId: string }) {
 export function ScenarioPicker({
   scenarios,
   profile,
+  identities,
   onSelect,
   onBack,
   voicePreference,
   onVoicePreferenceChange,
 }: ScenarioPickerProps) {
-  const identities = useMemo(() => {
-    const map = new Map<string, ProspectIdentity>();
-    for (const scenario of scenarios) {
-      map.set(scenario.id, generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
-    }
-    return map;
-  }, [scenarios, profile.market, profile.icpTitles, profile.service, voicePreference]);
-
   const featured = scenarios.find((s) => s.difficulty === "Easy") ?? scenarios[0];
   const rest = featured ? scenarios.filter((s) => s.id !== featured.id) : scenarios;
   const featuredIdentity = featured ? identities.get(featured.id) : undefined;

@@ -40,9 +40,14 @@ const FIRST_NAMES_FEMALE_BY_MARKET: Record<ProspectMarket, string[]> = {
     "Charlotte", "Olivia", "Amelia", "Isla", "Mia", "Grace", "Ava", "Willow",
     "Chloe", "Ivy", "Matilda", "Ruby", "Zoe", "Sophie", "Evie",
   ],
+  // Jordan/Morgan/Riley/Kai/Blake were dropped — genuinely unisex, but skew
+  // male-leaning enough in most readers' ears that they felt mismatched
+  // even when correctly assigned female. Replaced with names that read more
+  // clearly female while keeping the pool's international, non-country-
+  // specific flavor (distinct from the US/UK/Canada/Australia lists above).
   Other: [
-    "Jordan", "Morgan", "Riley", "Jamie", "Avery", "Reese", "Skyler", "Kai",
-    "Blake", "Elliot",
+    "Maya", "Nadia", "Sofia", "Elena", "Priya", "Jamie", "Avery", "Reese",
+    "Skyler", "Elliot",
   ],
 };
 

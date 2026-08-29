@@ -60,6 +60,22 @@ export function TrainingSetup() {
   }>({});
   const [loaded, setLoaded] = useState(false);
 
+  // Single source of truth for "which persona goes with which scenario" —
+  // generated once per scenario batch (not per screen) so the exact same
+  // identity (name, gender, photo) flows unchanged from the ScenarioPicker
+  // card preview through Ready/Call/Score. Previously ScenarioPicker built
+  // its own copy of this map purely for card display, while this component
+  // separately called generateProspectIdentity() again on Start Practice —
+  // two independent calls producing two unrelated people.
+  const identities = useMemo(() => {
+    const map = new Map<string, ProspectIdentity>();
+    if (!profile || !scenarios) return map;
+    for (const scenario of scenarios) {
+      map.set(scenario.id, generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
+    }
+    return map;
+  }, [scenarios, profile, voicePreference]);
+
   async function refreshEntitlement(): Promise<EntitlementStatus | null> {
     try {
       const res = await fetch("/api/entitlement/status");
@@ -174,7 +190,12 @@ export function TrainingSetup() {
       return;
     }
     setSelectedScenario(scenario);
-    if (profile) {
+    const identity = identities.get(scenario.id);
+    if (identity) {
+      setProspectIdentity(identity);
+    } else if (profile) {
+      // Defensive fallback only — the map above is built for every scenario
+      // in the current batch, so this shouldn't happen in practice.
       setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
     }
     setStep("ready");
@@ -379,6 +400,7 @@ export function TrainingSetup() {
       <ScenarioPicker
         scenarios={scenarios}
         profile={profile}
+        identities={identities}
         onSelect={(scenario) => void handleSelectScenario(scenario)}
         onBack={() => setStep("review")}
         voicePreference={voicePreference}
