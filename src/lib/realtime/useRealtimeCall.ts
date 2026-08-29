@@ -96,6 +96,44 @@ function scheduleBeep(audioContext: AudioContext, destination: AudioNode, freq: 
   oscillator.stop(startTime + duration + 0.02);
 }
 
+// A suspended AudioContext processes NOTHING — every node in its graph is
+// frozen, so the mic pipeline (analyser, noise gate, MediaStreamDestination
+// feeding the peer connection) would silently carry no audio at all even
+// though the raw getUserMedia() track itself is live (which is why the
+// browser's own mic-in-use indicator can show activity while literally
+// nothing reaches OpenAI, or moves the "You" bars). The previous fire-and-
+// forget `resume().catch(() => {})` swallowed this outcome with zero
+// logging — exactly the kind of failure that looks like "no errors at all".
+// Called at two points in start() (right after creation, and again once
+// getUserMedia() has actually granted mic access, which is itself a strong
+// user-activation signal some browsers honor even when the initial
+// creation — inside a useEffect, not synchronously inside the button
+// click — didn't).
+async function ensureAudioContextRunning(audioContext: AudioContext, attemptLabel: string): Promise<void> {
+  const stateBefore: string = audioContext.state;
+  if (stateBefore === "running") return;
+  if (stateBefore === "closed") {
+    // Expected once, harmlessly, in dev mode: React StrictMode's
+    // mount→cleanup→remount dance can close this exact AudioContext while
+    // start()'s own async chain is still using it (see the "closed"
+    // recovery in start() below, which recreates a fresh context when this
+    // happens) — not worth an alarming resume() attempt/log for a context
+    // we're about to replace anyway.
+    return;
+  }
+  try {
+    await audioContext.resume();
+  } catch (err) {
+    console.error(`[realtime audio] resume() threw (${attemptLabel})`, err);
+  }
+  const stateAfter: string = audioContext.state;
+  if (stateAfter !== "running") {
+    console.error(
+      `[realtime audio] AudioContext still "${stateAfter}" after resume() (${attemptLabel}) — mic audio will not reach the call until this becomes "running".`
+    );
+  }
+}
+
 function playDisconnectTone(audioContext: AudioContext): void {
   const t0 = audioContext.currentTime;
   scheduleBeep(audioContext, audioContext.destination, DISCONNECT_TONE_FREQ_HIGH_HZ, t0, DISCONNECT_BEEP_DURATION_S);
@@ -109,12 +147,28 @@ function playDisconnectTone(audioContext: AudioContext): void {
 }
 
 // Client-side noise gate thresholds — see startAmplitudeLoop for how these
-// are used. OPEN_THRESHOLD is a starting guess (0-1, same scale as
-// userAmplitudeRef) — tune up if real speech still gets gated out, or down
-// if noise still gets through. HOLD_MS keeps the gate open briefly after
-// amplitude dips so a natural mid-sentence pause doesn't get clipped.
-const NOISE_GATE_OPEN_THRESHOLD = 0.06;
+// are used. The gate's own open/close decision is driven by an RMS reading
+// of time-domain samples (see noiseGateDataArrayRef below), NOT the
+// frequency-bin-average metric userAmplitudeRef uses for the "You" bars —
+// averaging getByteFrequencyData() across all bins is a poor loudness proxy
+// (most bins carry near-zero energy for speech, dragging the average well
+// below what real speech should read as), and was silently keeping this
+// gate closed for real speech on at least some devices — total mic silence
+// reaching OpenAI, with no error anywhere, since the gate was just doing
+// exactly what its (mis-calibrated) logic said to do. RMS of the actual
+// waveform is the standard, far more reliable "is there sound" metric.
+// OPEN_THRESHOLD is a starting guess on that RMS scale (0-1) — tune down
+// further if noise still gets through, but err toward "too easy to open"
+// over "too hard": losing the caller's voice entirely is a much worse
+// failure than a little background noise passing. HOLD_MS keeps the gate
+// open briefly after amplitude dips so a natural mid-sentence pause doesn't
+// get clipped.
+const NOISE_GATE_OPEN_THRESHOLD = 0.02;
 const NOISE_GATE_HOLD_MS = 500;
+// The "closed" state attenuates heavily rather than fully silencing (0),
+// so even a threshold that's still miscalibrated for a given mic/room can
+// never result in total voice loss — only degraded noise suppression.
+const NOISE_GATE_CLOSED_GAIN = 0.15;
 
 export function useRealtimeCall() {
   const [status, setStatus] = useState<CallStatus>("idle");
@@ -150,6 +204,10 @@ export function useRealtimeCall() {
   // working on a given device.
   const noiseGateRef = useRef<GainNode | null>(null);
   const noiseGateOpenUntilRef = useRef(0);
+  // Time-domain buffer for the gate's own RMS reading — separate from
+  // userDataArrayRef (frequency-domain, drives the "You" amplitude bars UI)
+  // so fixing the gate's metric can't change how those bars already look.
+  const noiseGateDataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
 
   // Ring tone + perceived-pickup gating (see constants above).
   const ringGainRef = useRef<GainNode | null>(null);
@@ -179,13 +237,22 @@ export function useRealtimeCall() {
         userAmplitudeRef.current = amplitude;
 
         const gate = noiseGateRef.current;
-        if (gate) {
+        const gateData = noiseGateDataArrayRef.current;
+        if (gate && gateData) {
+          userAnalyser.getByteTimeDomainData(gateData);
+          let sumSquares = 0;
+          for (let i = 0; i < gateData.length; i++) {
+            const normalized = (gateData[i] - 128) / 128;
+            sumSquares += normalized * normalized;
+          }
+          const rms = Math.sqrt(sumSquares / gateData.length);
+
           const now = performance.now();
-          if (amplitude > NOISE_GATE_OPEN_THRESHOLD) {
+          if (rms > NOISE_GATE_OPEN_THRESHOLD) {
             gate.gain.value = 1;
             noiseGateOpenUntilRef.current = now + NOISE_GATE_HOLD_MS;
           } else if (now > noiseGateOpenUntilRef.current) {
-            gate.gain.value = 0;
+            gate.gain.value = NOISE_GATE_CLOSED_GAIN;
           }
         }
       } else {
@@ -313,6 +380,7 @@ export function useRealtimeCall() {
     prospectAmplitudeRef.current = 0;
     noiseGateRef.current = null;
     noiseGateOpenUntilRef.current = 0;
+    noiseGateDataArrayRef.current = null;
   }, [stopRingTone]);
 
   // Only flips timedOut — CallScreen's own effect on that flag is the sole
@@ -357,9 +425,25 @@ export function useRealtimeCall() {
         // immediately rather than after a network round trip. The rest of
         // this call's audio (amplitude analysis, noise gate) reuses this
         // same AudioContext once the connection is actually set up.
-        const audioContext = new AudioContext();
+        //
+        // `let`, not `const`: in dev mode, React StrictMode's mount→cleanup→
+        // remount dance runs this component's mount effect, then
+        // (synchronously, before this function's very first `await` below
+        // resolves) its cleanup — calling stop()/cleanup() on THIS still-
+        // in-flight attempt and closing this exact context. The remount's
+        // own startedRef guard (CallScreen.tsx) then blocks a *second*
+        // start() call (deliberately — the token fetch below reserves a
+        // real entitlement, so calling start() twice would burn two credits
+        // for what the user experiences as one call), so this original
+        // call's async chain is the only one there is, and it has to
+        // recover rather than being abandoned. If getUserMedia() (further
+        // below) finds this context already closed, it creates a fresh one
+        // and reassigns this same binding — which is exactly why this needs
+        // to be reassignable, so pc.ontrack's closure (captured further
+        // below, before that recovery can happen) sees the replacement too.
+        let audioContext = new AudioContext();
         audioContextRef.current = audioContext;
-        audioContext.resume().catch(() => {});
+        void ensureAudioContextRunning(audioContext, "on creation");
         ringStartTimeRef.current = performance.now();
         startRingTone(audioContext);
         startAmplitudeLoop();
@@ -386,6 +470,16 @@ export function useRealtimeCall() {
           callId: newCallId,
           deadlineAt,
         } = (await tokenRes.json()) as { value: string; callId: string; deadlineAt: string };
+        // A valid token means this call is genuinely continuing — reset the
+        // one-shot cleanup guard in case the StrictMode phantom described
+        // above already tripped it. Without this, cleanup()'s own
+        // idempotency guard (needed so the disconnect tone can't play
+        // twice — see cleanup()'s comment) would make the REAL end-of-call
+        // cleanup silently no-op later: the peer connection would never
+        // close and the mic would stay hot even after the user hits End
+        // Call. Harmless to reset in production, where this never tripped
+        // early in the first place.
+        cleanupStartedRef.current = false;
         setCallId(newCallId);
         startCountdown(deadlineAt);
 
@@ -422,6 +516,41 @@ export function useRealtimeCall() {
           },
         });
         streamRef.current = mediaStream;
+        if (audioContext.state === "closed") {
+          // The StrictMode phantom (see the `let audioContext` comment
+          // above) closed the original context before we got here —
+          // replace it rather than abandoning the call. Reassigning this
+          // same `audioContext` binding means pc.ontrack's closure (defined
+          // above, before this could be known) sees the replacement too.
+          console.warn(
+            "[realtime audio] AudioContext was closed before mic setup — creating a fresh one (expected once in dev mode from React StrictMode's double-invoked effects)."
+          );
+          // Clear the original ring-tone interval FIRST, while it's still
+          // reachable via the refs — otherwise calling startRingTone again
+          // below would overwrite ringIntervalRef/ringGainRef without ever
+          // clearing the original timer, leaving it running forever and
+          // throwing every cycle against the now-closed context.
+          stopRingTone();
+          audioContext = new AudioContext();
+          audioContextRef.current = audioContext;
+          await ensureAudioContextRunning(audioContext, "replacement after getUserMedia");
+          ringStartTimeRef.current = performance.now();
+          startRingTone(audioContext);
+          // cleanup() (called by the phantom above) also cancelled the
+          // amplitude loop's requestAnimationFrame chain — without
+          // restarting it here, the noise gate's gain would freeze at
+          // whatever it last was (silence or unfiltered, either way stuck)
+          // for the rest of the call, and the "You" bars would never move
+          // again. Safe to call again: the old rAF chain is already fully
+          // stopped, so this just starts a fresh one, not a second one.
+          startAmplitudeLoop();
+        } else {
+          // Second, awaited attempt — the mic permission grant the user just
+          // acted on is itself a strong activation signal, worth one more
+          // real try (not fire-and-forget this time) before wiring the graph
+          // that actually carries audio to the peer connection below.
+          await ensureAudioContextRunning(audioContext, "after getUserMedia");
+        }
 
         const userSource = audioContext.createMediaStreamSource(mediaStream);
         const userAnalyser = audioContext.createAnalyser();
@@ -429,6 +558,10 @@ export function useRealtimeCall() {
         userSource.connect(userAnalyser);
         userAnalyserRef.current = userAnalyser;
         userDataArrayRef.current = new Uint8Array(userAnalyser.frequencyBinCount);
+        // Time-domain buffer for the gate's RMS reading (see constants above)
+        // — length is fftSize here, not frequencyBinCount (that's only for
+        // the frequency-domain buffer above).
+        noiseGateDataArrayRef.current = new Uint8Array(userAnalyser.fftSize);
 
         // Route the mic through a gain node acting as a noise gate (opened/
         // closed every frame in startAmplitudeLoop based on amplitude) before
@@ -436,7 +569,7 @@ export function useRealtimeCall() {
         // the browser-level noiseSuppression constraint above, since that
         // constraint is advisory and not equally effective on every device.
         const noiseGate = audioContext.createGain();
-        noiseGate.gain.value = 0;
+        noiseGate.gain.value = NOISE_GATE_CLOSED_GAIN;
         userSource.connect(noiseGate);
         noiseGateRef.current = noiseGate;
 
@@ -536,7 +669,7 @@ export function useRealtimeCall() {
         void cleanup();
       }
     },
-    [cleanup, startAmplitudeLoop, startCountdown, startRingTone, triggerPickup]
+    [cleanup, startAmplitudeLoop, startCountdown, startRingTone, stopRingTone, triggerPickup]
   );
 
   const stop = useCallback(async () => {
