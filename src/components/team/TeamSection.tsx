@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { BuyCreditsButton } from "@/components/onboarding/BuyCreditsButton";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { FormField } from "@/components/ui/FormField";
 import { FormSection } from "@/components/ui/FormSection";
+import { InitialsAvatar } from "@/components/ui/InitialsAvatar";
 import { CREDIT_PACK_CALLS, CREDIT_PACK_PRICE_INR, TRIAL_CALL_MINUTES } from "@/lib/config/pricing";
 import { READINESS_MIN_AVG_SCORE, READINESS_MIN_CALLS } from "@/lib/config/readiness";
-import { MyTeamResponse, TeamMemberAnalytics } from "@/lib/team/types";
+import { MyTeamResponse, TeamMemberAnalytics, TeamMemberRow } from "@/lib/team/types";
 
 // Framed around rough team size, not raw pack count — an agency owner
 // thinks "how many people," not "how many 40-call packs." Illustrative
@@ -49,6 +49,21 @@ function formatDate(iso: string | null): string {
 
 function isReady(a: TeamMemberAnalytics): boolean {
   return a.totalCalls >= READINESS_MIN_CALLS && (a.avgOverallScore ?? 0) >= READINESS_MIN_AVG_SCORE;
+}
+
+// The get_team_member_analytics() RPC only includes the owner if they have
+// at least one call themselves (most owners are managers, not practicers —
+// see the migration comment in supabase/migrations/0014_team_analytics.sql).
+// Every other active member is always present, even at zero calls. So a
+// missing row for an active member can only mean "owner, zero calls" —
+// this fills that in for display rather than silently showing nothing,
+// without inventing any new fetch or business rule.
+function analyticsFor(member: TeamMemberRow, analytics: TeamMemberAnalytics[] | null): TeamMemberAnalytics | null {
+  if (member.status !== "active") return null;
+  const found = analytics?.find((a) => a.userId === member.userId);
+  if (found) return found;
+  if (analytics === null) return null;
+  return { userId: member.userId, email: member.email, totalCalls: 0, avgOverallScore: null, lastCallAt: null, topObjectionTags: [] };
 }
 
 // Shared inline two-step confirm — no Dialog/Modal primitive exists
@@ -202,9 +217,9 @@ function InviteForm({ teamId, onInvited }: { teamId: string; onInvited: () => vo
   }
 
   return (
-    <div className="mt-6 border-t border-zinc-100 pt-6 dark:border-zinc-900">
-      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Invite a member</p>
-      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Invite a member</p>
+      <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
         We don&apos;t send an email yet — you&apos;ll get a link to share yourself.
       </p>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -217,7 +232,7 @@ function InviteForm({ teamId, onInvited }: { teamId: string; onInvited: () => vo
       </div>
       {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
       {inviteUrl && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
           <input readOnly value={inviteUrl} className="flex-1 truncate bg-transparent text-sm text-zinc-700 outline-none dark:text-zinc-300" />
           <button
             type="button"
@@ -226,64 +241,6 @@ function InviteForm({ teamId, onInvited }: { teamId: string; onInvited: () => vo
           >
             {copied ? "Copied" : "Copy"}
           </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TeamActivitySection({ analytics }: { analytics: TeamMemberAnalytics[] | null }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="mt-5">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-left dark:border-zinc-800 dark:bg-zinc-950"
-      >
-        <span className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-          Team activity
-        </span>
-        <span className="flex items-center gap-1 text-xs text-zinc-400 dark:text-zinc-500">
-          {open ? "Hide" : "Show"}
-          {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
-        </span>
-      </button>
-
-      {open && (
-        <div className="mt-2 flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
-          {analytics === null ? (
-            <p className="py-3 text-sm text-zinc-400 dark:text-zinc-500">Loading activity…</p>
-          ) : analytics.length === 0 ? (
-            <p className="py-3 text-sm text-zinc-400 dark:text-zinc-500">No practice activity yet.</p>
-          ) : (
-            analytics.map((a) => (
-              <div key={a.userId} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-zinc-900 dark:text-zinc-50">{a.email}</p>
-                  {a.totalCalls === 0 ? (
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500">No calls yet</p>
-                  ) : (
-                    <>
-                      <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                        {a.totalCalls} call{a.totalCalls === 1 ? "" : "s"} · avg score {a.avgOverallScore} · last
-                        practiced {formatDate(a.lastCallAt)}
-                      </p>
-                      {a.topObjectionTags.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          {a.topObjectionTags.map((tag) => (
-                            <Chip key={tag}>{tag}</Chip>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-                <Chip tone={isReady(a) ? "positive" : "neutral"}>{isReady(a) ? "Ready" : "Still practicing"}</Chip>
-              </div>
-            ))
-          )}
         </div>
       )}
     </div>
@@ -316,8 +273,10 @@ function BuyTeamCreditsControl({ teamId, onPurchased }: { teamId: string; onPurc
   }
 
   return (
-    <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
-      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Buy credits for your team</p>
+    <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+      <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+        Buy credits for your team
+      </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {QUANTITY_PRESETS.map((preset) => (
           <Chip
@@ -417,7 +376,7 @@ function DeleteTeamControl({ team, onDeleted }: { team: Extract<MyTeamResponse, 
   }
 
   return (
-    <div className="mt-6 border-t border-zinc-100 pt-6 dark:border-zinc-900">
+    <div className="rounded-b-2xl border-t border-zinc-100 p-6 dark:border-zinc-900">
       <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Danger zone</p>
       {!confirming ? (
         <Button variant="danger" className="mt-3" onClick={() => setConfirming(true)}>
@@ -438,6 +397,87 @@ function DeleteTeamControl({ team, onDeleted }: { team: Extract<MyTeamResponse, 
   );
 }
 
+function EmptyRosterState() {
+  return (
+    <div className="mt-3 flex flex-col items-center gap-1 rounded-xl border border-dashed border-zinc-300 px-4 py-8 text-center dark:border-zinc-700">
+      <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">It&apos;s just you so far.</p>
+      <p className="max-w-xs text-sm text-zinc-400 dark:text-zinc-500">
+        Invite your first team member below to start pooling credits and tracking practice.
+      </p>
+    </div>
+  );
+}
+
+function MemberRow({
+  member,
+  analytics,
+  analyticsLoading,
+  onRemove,
+  removing,
+}: {
+  member: TeamMemberRow;
+  analytics: TeamMemberAnalytics | null;
+  analyticsLoading: boolean;
+  onRemove?: (userId: string) => void;
+  removing?: boolean;
+}) {
+  const ready = analytics ? isReady(analytics) : false;
+
+  return (
+    <div className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-start gap-3">
+        <InitialsAvatar label={member.email} />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">{member.email}</p>
+          <p className="mt-0.5 text-xs text-zinc-400 dark:text-zinc-500">
+            {member.role === "owner" ? "Owner" : "Member"} ·{" "}
+            {member.status === "invited" ? "Invited" : `Joined ${formatDate(member.joinedAt)}`}
+          </p>
+
+          {member.status === "active" &&
+            (analyticsLoading ? (
+              <div className="mt-1.5 h-3 w-40 max-w-full animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+            ) : (
+              analytics && (
+                <>
+                  <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+                    {analytics.totalCalls === 0
+                      ? "No calls yet"
+                      : `${analytics.totalCalls} call${analytics.totalCalls === 1 ? "" : "s"} · avg score ${analytics.avgOverallScore} · last practiced ${formatDate(analytics.lastCallAt)}`}
+                  </p>
+                  {analytics.topObjectionTags.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {analytics.topObjectionTags.map((tag) => (
+                        <Chip key={tag}>{tag}</Chip>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )
+            ))}
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-3 pl-[52px] sm:pl-0">
+        {analytics && analytics.totalCalls > 0 && (
+          <Chip tone={ready ? "positive" : "neutral"}>{ready ? "Ready" : "Still practicing"}</Chip>
+        )}
+        {member.status === "invited" && <Chip>Invited</Chip>}
+        {onRemove && (
+          <button
+            type="button"
+            onClick={() => onRemove(member.userId)}
+            disabled={removing}
+            className="text-xs text-zinc-400 underline-offset-4 hover:text-red-600 hover:underline disabled:opacity-50 dark:text-zinc-500 dark:hover:text-red-400"
+          >
+            {removing ? "Removing…" : "Remove"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OwnerView({
   team,
   analytics,
@@ -448,6 +488,7 @@ function OwnerView({
   onRefresh: () => void;
 }) {
   const [removing, setRemoving] = useState<string | null>(null);
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
 
   async function handleRemove(userId: string) {
     setRemoving(userId);
@@ -463,54 +504,64 @@ function OwnerView({
     }
   }
 
+  const analyticsLoading = analytics === null;
+  const hasOtherMembers = team.members.length > 1;
+  const hasInvites = team.invites.length > 0;
+
   return (
-    <FormSection title={team.teamName} description="You own this team.">
-      <div className="sm:col-span-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Team credit pool</p>
-        <p className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{team.creditsBalance} calls</p>
-
-        <BuyTeamCreditsControl teamId={team.teamId} onPurchased={onRefresh} />
-
-        {team.members.length > 0 && (
-          <div className="mt-5">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Members</p>
-            <div className="mt-2 flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
-              {team.members.map((m) => (
-                <div key={m.userId} className="flex items-center justify-between gap-3 py-2.5">
-                  <div>
-                    <p className="text-sm text-zinc-900 dark:text-zinc-50">{m.email}</p>
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                      {m.role === "owner" ? "Owner" : "Member"} · joined {formatDate(m.joinedAt)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Chip>{m.status}</Chip>
-                    {m.role !== "owner" && (
-                      <button
-                        type="button"
-                        onClick={() => void handleRemove(m.userId)}
-                        disabled={removing === m.userId}
-                        className="text-xs text-zinc-400 underline-offset-4 hover:text-red-600 hover:underline disabled:opacity-50 dark:text-zinc-500 dark:hover:text-red-400"
-                      >
-                        {removing === m.userId ? "Removing…" : "Remove"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+    <div className="rounded-2xl border border-zinc-200/70 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      {/* Identity + compact credit-pool indicator */}
+      <div className="flex flex-col gap-4 border-b border-zinc-100 p-6 dark:border-zinc-900 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{team.teamName}</h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">You own this team.</p>
+        </div>
+        <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end sm:justify-start sm:gap-1">
+          <div className="text-left sm:text-right">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Credit pool</p>
+            <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{team.creditsBalance} calls</p>
           </div>
-        )}
+          <button
+            type="button"
+            onClick={() => setShowBuyCredits((v) => !v)}
+            className="text-xs text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
+          >
+            {showBuyCredits ? "Hide" : "Top up"}
+          </button>
+        </div>
+      </div>
 
-        <TeamActivitySection analytics={analytics} />
+      {/* Member roster — primary content */}
+      <div className="p-6">
+        <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+          Members · {team.members.length}
+        </p>
+        <div className="mt-2 flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
+          {team.members.map((m) => (
+            <MemberRow
+              key={m.userId}
+              member={m}
+              analytics={analyticsFor(m, analytics)}
+              analyticsLoading={m.status === "active" && analyticsLoading}
+              onRemove={m.role !== "owner" ? handleRemove : undefined}
+              removing={removing === m.userId}
+            />
+          ))}
+        </div>
+        {!hasOtherMembers && !hasInvites && <EmptyRosterState />}
+      </div>
 
-        {team.invites.length > 0 && (
-          <div className="mt-5">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Pending invites</p>
+      {/* Actions — visually secondary, clearly separated from the roster */}
+      <div className="border-t border-zinc-100 bg-zinc-50/60 p-6 dark:border-zinc-900 dark:bg-zinc-900/20">
+        {hasInvites && (
+          <div className="mb-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+              Pending invites
+            </p>
             <div className="mt-2 flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
               {team.invites.map((inv) => (
-                <div key={inv.email} className="flex items-center justify-between gap-3 py-2.5">
-                  <p className="text-sm text-zinc-900 dark:text-zinc-50">{inv.email}</p>
+                <div key={inv.email} className="flex items-center justify-between gap-3 py-2">
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">{inv.email}</p>
                   <Chip>expires {formatDate(inv.expiresAt)}</Chip>
                 </div>
               ))}
@@ -520,9 +571,11 @@ function OwnerView({
 
         <InviteForm teamId={team.teamId} onInvited={onRefresh} />
 
-        <DeleteTeamControl team={team} onDeleted={onRefresh} />
+        {showBuyCredits && <BuyTeamCreditsControl teamId={team.teamId} onPurchased={onRefresh} />}
       </div>
-    </FormSection>
+
+      <DeleteTeamControl team={team} onDeleted={onRefresh} />
+    </div>
   );
 }
 
@@ -581,17 +634,46 @@ function MemberView({
   onLeft: () => void;
 }) {
   return (
-    <FormSection title={team.teamName} description="You're a member of this team.">
-      <div className="flex flex-col gap-4 sm:col-span-2">
-        <div className="flex items-center gap-2">
-          <Chip>{team.status}</Chip>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Your practice calls draw from this team&apos;s shared credit pool.
-          </p>
-        </div>
+    <div className="rounded-2xl border border-zinc-200/70 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{team.teamName}</h2>
+      <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">You&apos;re a member of this team.</p>
+
+      <div className="mt-5 flex items-center gap-2">
+        <Chip>{team.status}</Chip>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Your practice calls draw from this team&apos;s shared credit pool.
+        </p>
+      </div>
+
+      <div className="mt-6 border-t border-zinc-100 pt-6 dark:border-zinc-900">
         <LeaveTeamControl onLeft={onLeft} />
       </div>
-    </FormSection>
+    </div>
+  );
+}
+
+function TeamSectionSkeleton() {
+  return (
+    <div
+      className="animate-pulse rounded-2xl border border-zinc-200/70 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+      aria-hidden
+    >
+      <div className="flex items-center justify-between">
+        <div className="h-4 w-32 rounded bg-zinc-100 dark:bg-zinc-800" />
+        <div className="h-4 w-16 rounded bg-zinc-100 dark:bg-zinc-800" />
+      </div>
+      <div className="mt-8 flex flex-col gap-5">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-3">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-zinc-100 dark:bg-zinc-800" />
+            <div className="flex-1">
+              <div className="h-3.5 w-40 rounded bg-zinc-100 dark:bg-zinc-800" />
+              <div className="mt-2 h-3 w-24 rounded bg-zinc-100 dark:bg-zinc-800" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -620,7 +702,8 @@ export function TeamSection() {
     refresh();
   }, []);
 
-  if (loading || !team) return null;
+  if (loading) return <TeamSectionSkeleton />;
+  if (!team) return null;
 
   if (team.role === "owner") return <OwnerView team={team} analytics={analytics} onRefresh={refresh} />;
   if (team.role === "member") return <MemberView team={team} onLeft={refresh} />;

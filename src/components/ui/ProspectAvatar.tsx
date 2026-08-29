@@ -7,14 +7,17 @@ import { ProspectIdentity } from "@/lib/types";
 // expanding the app's actual accent-color language (still just muted zinc-
 // adjacent tones, chosen deterministically per prospect so the same person
 // always gets the same avatar).
-const PALETTES: [string, string][] = [
+// Exported for reuse by InitialsAvatar (team roster) — same deterministic,
+// low-saturation coloring language, applied to real people instead of
+// generated prospects.
+export const AVATAR_PALETTES: [string, string][] = [
   ["#d9e8e0", "#a9c7b7"], // sage
   ["#e7ddd3", "#c9ab8f"], // clay
   ["#dbe1ea", "#a9b9cf"], // slate-blue
   ["#e6e2da", "#c4bcae"], // stone
 ];
 
-function hashString(value: string): number {
+export function hashString(value: string): number {
   let hash = 0;
   for (let i = 0; i < value.length; i++) {
     hash = (hash << 5) - hash + value.charCodeAt(i);
@@ -42,7 +45,7 @@ export function ProspectAvatar({ identity, size = "md", active = false, amplitud
   const gradientId = useId();
   const ringRef = useRef<SVGCircleElement | null>(null);
   const hash = hashString(identity.fullName);
-  const [from, to] = PALETTES[hash % PALETTES.length];
+  const [from, to] = AVATAR_PALETTES[hash % AVATAR_PALETTES.length];
   const skew = ((hash % 7) - 3) * 0.6; // small deterministic jitter, purely cosmetic variety
   const px = SIZE_PX[size];
 
