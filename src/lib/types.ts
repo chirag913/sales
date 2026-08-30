@@ -61,10 +61,13 @@ export interface SalesProfile {
 // They're just not offered in PROSPECT_MARKET_OPTIONS below anymore.
 export type ProspectMarket = "US" | "UK" | "Canada" | "Australia" | "India" | "Other";
 
-export const PROSPECT_MARKET_OPTIONS: { value: ProspectMarket; label: string; flag: string }[] = [
-  { value: "US", label: "United States", flag: "🇺🇸" },
-  { value: "India", label: "India", flag: "🇮🇳" },
-  { value: "Other", label: "Other", flag: "🌐" },
+// Flags render via MarketFlag (real SVG, not the 🇺🇸/🇮🇳 emoji — those
+// depend on the OS's emoji font, which many desktop browsers lack full
+// coverage for) rather than a field here.
+export const PROSPECT_MARKET_OPTIONS: { value: ProspectMarket; label: string }[] = [
+  { value: "US", label: "United States" },
+  { value: "India", label: "India" },
+  { value: "Other", label: "Other" },
 ];
 
 export type ProspectLanguage = "english" | "hinglish";

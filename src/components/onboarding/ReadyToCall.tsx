@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Headphones, Mic, ShieldCheck, Volume1 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { MarketFlag } from "@/components/ui/MarketFlag";
 import { ProspectAvatar } from "@/components/ui/ProspectAvatar";
 import { CALL_TYPE_OPTIONS, ProspectIdentity, Scenario, TrainingProfile } from "@/lib/types";
 
@@ -14,13 +15,17 @@ interface ReadyToCallProps {
   onStartCall: () => void;
 }
 
+// Plain text only — the icon rendered next to it is the real MarketFlag
+// SVG (not emoji, see MarketFlag.tsx). Covers legacy UK/Canada/Australia
+// values too, so a returning user's stored profile still shows a real
+// name — see the ProspectMarket comment in types.ts.
 const MARKET_LABEL: Record<string, string> = {
-  US: "🇺🇸 United States",
-  UK: "🇬🇧 United Kingdom",
-  Canada: "🇨🇦 Canada",
-  Australia: "🇦🇺 Australia",
-  India: "🇮🇳 India",
-  Other: "🌍 Other",
+  US: "United States",
+  UK: "United Kingdom",
+  Canada: "Canada",
+  Australia: "Australia",
+  India: "India",
+  Other: "Other",
 };
 
 export function ReadyToCall({ profile, scenario, identity, onBack, onStartCall }: ReadyToCallProps) {
@@ -50,7 +55,8 @@ export function ReadyToCall({ profile, scenario, identity, onBack, onStartCall }
         <dl className="mt-6 space-y-4 border-t border-zinc-100 pt-6 dark:border-zinc-900">
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Target</dt>
-            <dd className="text-zinc-900 dark:text-zinc-50">
+            <dd className="flex items-center gap-1.5 text-zinc-900 dark:text-zinc-50">
+              <MarketFlag market={profile.market} className="h-3.5 w-[1.3125rem] shrink-0" />
               {MARKET_LABEL[profile.market] ?? profile.market} · {profile.service}
             </dd>
           </div>

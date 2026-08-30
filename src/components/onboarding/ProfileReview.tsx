@@ -20,6 +20,7 @@ import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { ChipsEditor } from "@/components/ui/ChipsEditor";
 import { INPUT_CLASSES } from "@/components/ui/inputClasses";
+import { MarketFlag } from "@/components/ui/MarketFlag";
 import { CALL_TYPE_OPTIONS, CallType, PROSPECT_MARKET_OPTIONS, SALES_OBJECTIVE_OPTIONS, TrainingProfile } from "@/lib/types";
 
 interface ProfileReviewProps {
@@ -31,13 +32,18 @@ interface ProfileReviewProps {
   confirmError: string | null;
 }
 
+// Plain text only — used inside <option> (native <select> options can't
+// render an SVG icon) and as the label next to the real MarketFlag icon
+// where one is shown. Covers legacy UK/Canada/Australia values too, so a
+// returning user's stored profile still displays a real name instead of
+// the raw enum value — see the ProspectMarket comment in types.ts.
 const MARKET_LABEL: Record<string, string> = {
-  US: "🇺🇸 United States",
-  UK: "🇬🇧 United Kingdom",
-  Canada: "🇨🇦 Canada",
-  Australia: "🇦🇺 Australia",
-  India: "🇮🇳 India",
-  Other: "🌍 Other",
+  US: "United States",
+  UK: "United Kingdom",
+  Canada: "Canada",
+  Australia: "Australia",
+  India: "India",
+  Other: "Other",
 };
 
 // Literal cold-to-warm scale (sky -> amber -> orange), not emerald — see
@@ -382,7 +388,10 @@ export function ProfileReview({
                 </>
               ) : (
                 <>
-                  <p className="text-lg text-zinc-900 dark:text-zinc-50">{MARKET_LABEL[profile.market] ?? profile.market}</p>
+                  <p className="flex items-center gap-2 text-lg text-zinc-900 dark:text-zinc-50">
+                    <MarketFlag market={profile.market} className="h-4 w-6 shrink-0" />
+                    {MARKET_LABEL[profile.market] ?? profile.market}
+                  </p>
                   <EditButton onClick={() => startEdit("market", { market: profile.market })} />
                 </>
               )}

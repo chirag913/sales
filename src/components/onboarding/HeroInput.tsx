@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { MarketFlag } from "@/components/ui/MarketFlag";
 import { PROSPECT_MARKET_OPTIONS, ProspectMarket } from "@/lib/types";
 
 export interface HeroInputValue {
@@ -89,9 +90,7 @@ export function HeroInput({ onSubmit, loading, error }: HeroInputProps) {
                     : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:border-zinc-500"
                 }`}
               >
-                <span className="text-2xl" aria-hidden>
-                  {opt.flag}
-                </span>
+                <MarketFlag market={opt.value} className="h-6 w-9" />
                 <span className="text-sm font-medium">{opt.label}</span>
               </button>
             ))}
