@@ -3,7 +3,7 @@ import { REALTIME_MODEL, REALTIME_TRANSCRIBE_MODEL, pickVoiceForGender } from "@
 import { MAX_CALL_DURATION_SECONDS } from "@/lib/config/pricing";
 import { buildProspectPrompt } from "@/lib/prompts/buildProspectPrompt";
 import { createClient } from "@/lib/supabase/server";
-import { ProspectIdentity, SalesProfile, Scenario, TrainingProfile } from "@/lib/types";
+import { getProspectLanguage, ProspectIdentity, SalesProfile, Scenario, TrainingProfile } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -52,6 +52,16 @@ export async function POST(req: NextRequest) {
   const { call_id: callId } = reservation as { call_id: string; entitlement_type: string };
 
   const instructions = buildProspectPrompt(salesProfile, trainingProfile, scenario, identity);
+  // Without a language hint, Whisper-family transcription models frequently
+  // mistake spoken Hindi for Urdu — acoustically near-identical spoken
+  // languages ("Hindustani") that use completely different scripts — and
+  // transcribe in Perso-Arabic script instead of Devanagari. Same
+  // market/language check buildProspectPrompt.ts uses for the prospect's
+  // own speech; English-market calls get no language hint at all, same as
+  // before. There is no supported way to request romanized/Latin output
+  // instead of Devanagari for Hindi — OpenAI's transcription models don't
+  // offer that, with or without this hint.
+  const isHinglishCall = getProspectLanguage(trainingProfile.market) === "hinglish";
   const voiceGender =
     identity.gender === "male" || identity.gender === "female"
       ? identity.gender
@@ -74,7 +84,10 @@ export async function POST(req: NextRequest) {
           instructions,
           audio: {
             input: {
-              transcription: { model: REALTIME_TRANSCRIBE_MODEL },
+              transcription: {
+                model: REALTIME_TRANSCRIBE_MODEL,
+                ...(isHinglishCall ? { language: "hi" } : {}),
+              },
               turn_detection: {
                 type: "server_vad",
                 interrupt_response: true,
