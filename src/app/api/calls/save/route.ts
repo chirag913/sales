@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tagObjections } from "@/lib/ai/objectionTags";
+import { checkRateLimit } from "@/lib/supabase/rateLimit";
+import { transcriptToText } from "@/lib/transcript";
 import { createClient } from "@/lib/supabase/server";
 import { CallScoreResult, ProspectIdentity, Scenario, TranscriptEntry } from "@/lib/types";
 
@@ -20,6 +22,8 @@ export async function POST(req: NextRequest) {
   const durationSeconds = typeof body?.durationSeconds === "number" ? body.durationSeconds : undefined;
   const result = body?.result as CallScoreResult | undefined;
   const transcript = body?.transcript as TranscriptEntry[] | undefined;
+  const endedBy = ["caller", "prospect", "timeout"].includes(body?.endedBy) ? (body.endedBy as string) : "caller";
+  const prospectEndReason = typeof body?.prospectEndReason === "string" ? body.prospectEndReason : undefined;
 
   if (!callId || !scenario || !identity || durationSeconds === undefined || !result || !transcript) {
     return NextResponse.json(
@@ -35,15 +39,27 @@ export async function POST(req: NextRequest) {
   // into calls below. Checking first means any authenticated user could
   // otherwise fabricate arbitrary "completed call" rows and spend OpenAI
   // tokens for free, with no connection to their credit/trial balance.
+  //
+  // 'completed'/'timeout' are accepted too, on purpose: the save is retried by
+  // the client after a failure, and a first attempt that got as far as
+  // finalize_call() (below) but failed afterwards leaves the row in one of
+  // those states. Without this a retry would be rejected forever. It still
+  // requires a real call_sessions row belonging to this user.
   const { data: session } = await supabase
     .from("call_sessions")
     .select("id")
     .eq("id", callId)
-    .eq("status", "started")
+    .in("status", ["started", "completed", "timeout"])
     .maybeSingle();
 
   if (!session) {
     return NextResponse.json({ error: "No active call session." }, { status: 403 });
+  }
+
+  // Saves are retried by the client after a failure, so this is generous;
+  // it only stops a loop.
+  if (!(await checkRateLimit(supabase, "calls/save", { limit: 40, windowSeconds: 60 * 60 }))) {
+    return NextResponse.json({ error: "Too many save attempts. Please wait a bit and try again." }, { status: 429 });
   }
 
   try {
@@ -55,11 +71,8 @@ export async function POST(req: NextRequest) {
       p_duration_seconds: durationSeconds,
     });
 
-    const transcriptText = transcript
-      .filter((entry) => entry.final)
-      .map((entry) => `${entry.role === "user" ? "Caller" : "Prospect"}: ${entry.text}`)
-      .join("\n");
-    const objectionTags = await tagObjections(transcriptText);
+    // Same rule as scoring: only finished, fully heard turns.
+    const objectionTags = await tagObjections(transcriptToText(transcript));
 
     const { error } = await supabase.from("calls").upsert({
       id: callId,
@@ -75,6 +88,12 @@ export async function POST(req: NextRequest) {
       better_responses: result.betterResponses,
       transcript,
       objection_tags: objectionTags,
+      extra: {
+        objectiveOutcome: result.objectiveOutcome ?? null,
+        workOnNext: result.workOnNext ?? [],
+        endedBy,
+        prospectEndReason: prospectEndReason ?? null,
+      },
     });
 
     if (error) {

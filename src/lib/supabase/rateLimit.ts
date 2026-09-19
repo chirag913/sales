@@ -11,11 +11,20 @@ const WINDOW_SECONDS = 60 * 60;
 // an unexpected RPC error so a transient DB hiccup can't block real usage;
 // the routes calling this are already the least security-critical ones
 // (cost containment, not access control).
-export async function checkRateLimit(supabase: SupabaseClient, route: string): Promise<boolean> {
+export interface RateLimitOptions {
+  limit?: number;
+  windowSeconds?: number;
+}
+
+export async function checkRateLimit(
+  supabase: SupabaseClient,
+  route: string,
+  { limit = REQUESTS_PER_HOUR, windowSeconds = WINDOW_SECONDS }: RateLimitOptions = {}
+): Promise<boolean> {
   const { data, error } = await supabase.rpc("check_rate_limit", {
     p_route: route,
-    p_limit: REQUESTS_PER_HOUR,
-    p_window_seconds: WINDOW_SECONDS,
+    p_limit: limit,
+    p_window_seconds: windowSeconds,
   });
   if (error) {
     console.error(`rate limit check failed for ${route}`, error);

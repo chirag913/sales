@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { MAX_CALL_DURATION_SECONDS } from "@/lib/config/pricing";
 import { EntitlementStatus } from "@/lib/entitlement/types";
+import { reapExpiredCalls } from "@/lib/realtime/serverCutoff";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
@@ -9,6 +10,11 @@ export async function GET() {
   if (!authData?.claims) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
+
+  // Backstop for the scheduled server-side cutoff (see /api/realtime/session):
+  // end any call of this user that has outlived the cap. Not awaited — it must
+  // never slow down or fail the status check.
+  void reapExpiredCalls(authData.claims.sub, MAX_CALL_DURATION_SECONDS);
 
   const { data, error } = await supabase
     .rpc("get_entitlement_status", { p_max_duration_seconds: MAX_CALL_DURATION_SECONDS })

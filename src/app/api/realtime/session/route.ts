@@ -1,34 +1,61 @@
-import { NextRequest, NextResponse } from "next/server";
-import { REALTIME_MODEL, REALTIME_TRANSCRIBE_MODEL, pickVoiceForGender } from "@/lib/ai/models";
+import { NextRequest, NextResponse, after } from "next/server";
+import { pickVoiceForGender } from "@/lib/ai/models";
 import { MAX_CALL_DURATION_SECONDS } from "@/lib/config/pricing";
+import { normalizeTrainingProfile } from "@/lib/profile/normalize";
 import { buildProspectPrompt } from "@/lib/prompts/buildProspectPrompt";
+import { buildRealtimeSessionConfig } from "@/lib/realtime/sessionConfig";
+import { CUTOFF_GRACE_MS, hangupProviderCall, markProviderHungUp, reapExpiredCalls } from "@/lib/realtime/serverCutoff";
+import { checkRateLimit } from "@/lib/supabase/rateLimit";
 import { createClient } from "@/lib/supabase/server";
-import { ProspectIdentity, SalesProfile, Scenario, TrainingProfile } from "@/lib/types";
+import { ProspectIdentity, Scenario, TrainingProfile } from "@/lib/types";
 
+// The scheduled cutoff below (after()) keeps this invocation alive until the
+// call's deadline. On hosts that cap function duration, the cap must be at
+// least MAX_CALL_DURATION_SECONDS plus the grace period; hosts that don't
+// enforce one (a plain `next start`) ignore this. The backstop reaper
+// (reapExpiredCalls) covers the case where the host kills it earlier.
+export const maxDuration = 330;
+
+const OPENAI_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
+
+// The server brokers the WebRTC handshake instead of handing the browser an
+// ephemeral key. That keeps the OpenAI credential off the client and, more
+// importantly, gives the server the provider's call id, so it can hang the
+// call up itself when the time cap is reached (a modified client can no
+// longer keep the session alive by ignoring its own countdown).
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getClaims();
-  if (!authData?.claims) {
+  const userId = authData?.claims?.sub;
+  if (!userId) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 
   const body = await req.json().catch(() => null);
-  const salesProfile = body?.salesProfile as SalesProfile | undefined;
-  const trainingProfile = body?.trainingProfile as TrainingProfile | undefined;
+  const offerSdp = typeof body?.offerSdp === "string" ? body.offerSdp : undefined;
+  const storedProfile = body?.trainingProfile as TrainingProfile | undefined;
   const scenario = body?.scenario as Scenario | undefined;
   const identity = body?.identity as ProspectIdentity | undefined;
 
-  if (!salesProfile || !trainingProfile || !scenario || !identity) {
-    return NextResponse.json(
-      { error: "salesProfile, trainingProfile, scenario, and identity are required." },
-      { status: 400 }
-    );
+  if (!offerSdp || !storedProfile || !scenario || !identity) {
+    return NextResponse.json({ error: "offerSdp, trainingProfile, scenario, and identity are required." }, { status: 400 });
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "OPENAI_API_KEY is not set." }, { status: 500 });
   }
+
+  // Not the main cost control (reserve_call_entitlement is) — just stops a
+  // tight loop against this route. A real user can start well under 12 calls
+  // an hour given the 5-minute cap.
+  if (!(await checkRateLimit(supabase, "realtime/session", { limit: 30, windowSeconds: 60 * 60 }))) {
+    return NextResponse.json({ error: "Too many requests. Please slow down." }, { status: 429 });
+  }
+
+  // Backstop for the scheduled cutoff: end any of this user's calls that are
+  // past the cap but still alive at the provider.
+  await reapExpiredCalls(userId, MAX_CALL_DURATION_SECONDS);
 
   // Reserve one trial call or paid credit BEFORE creating an expensive OpenAI
   // realtime session. This is an atomic, server-side DB operation — see
@@ -51,56 +78,24 @@ export async function POST(req: NextRequest) {
 
   const { call_id: callId } = reservation as { call_id: string; entitlement_type: string };
 
-  const instructions = buildProspectPrompt(salesProfile, trainingProfile, scenario, identity);
-  const voiceGender =
-    identity.gender === "male" || identity.gender === "female"
-      ? identity.gender
-      : Math.random() < 0.5
-        ? "male"
-        : "female";
-  const voice = pickVoiceForGender(voiceGender);
-
   try {
-    const res = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
+    const trainingProfile = normalizeTrainingProfile(storedProfile);
+    const instructions = buildProspectPrompt(trainingProfile, scenario, identity);
+    const voiceGender =
+      identity.gender === "male" || identity.gender === "female" ? identity.gender : Math.random() < 0.5 ? "male" : "female";
+    const voice = pickVoiceForGender(voiceGender, identity.fullName);
+
+    // Plain string fields, NOT Blob/File parts: OpenAI rejects a part that
+    // carries a filename ("field sdp is required but not found"). Verified
+    // against the live endpoint with a real WebRTC offer.
+    const form = new FormData();
+    form.append("sdp", offerSdp);
+    form.append("session", JSON.stringify(buildRealtimeSessionConfig({ instructions, voice })));
+
+    const res = await fetch(OPENAI_CALLS_URL, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        session: {
-          type: "realtime",
-          model: REALTIME_MODEL,
-          instructions,
-          audio: {
-            input: {
-              transcription: { model: REALTIME_TRANSCRIBE_MODEL },
-              turn_detection: {
-                type: "server_vad",
-                interrupt_response: true,
-                // Defaults (silence_duration_ms: 500, prefix_padding_ms: 300) were
-                // splitting a single utterance into two conversation items on a
-                // brief mid-sentence pause, and clipping the first syllable at the
-                // start of a turn. Widened both to reduce false turn-ends and give
-                // more lead-in audio before the detected speech start.
-                silence_duration_ms: 750,
-                prefix_padding_ms: 500,
-                // Default threshold (0.5) picks up steady ambient noise (fan hum,
-                // room noise) as "speech started" — since interrupt_response is on,
-                // that falsely cuts the prospect off mid-response and can leave the
-                // turn stuck waiting for the (noise-sustained) "silence" that never
-                // comes. 0.7 alone wasn't enough against real fan noise in testing;
-                // paired with noiseSuppression on the mic track (useRealtimeCall.ts)
-                // which should also make real speech register more cleanly.
-                threshold: 0.8,
-              },
-            },
-            output: {
-              voice,
-            },
-          },
-        },
-      }),
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
     });
 
     if (!res.ok) {
@@ -110,12 +105,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to start realtime session." }, { status: 502 });
     }
 
-    const data = (await res.json()) as { value: string; expires_at: number };
+    const answerSdp = await res.text();
+    // e.g. "/v1/realtime/calls/rtc_abc123"
+    const providerCallId = res.headers.get("location")?.split("/").pop() ?? null;
 
     await supabase.rpc("mark_call_started", { p_call_id: callId });
-    const deadlineAt = new Date(Date.now() + MAX_CALL_DURATION_SECONDS * 1000).toISOString();
+    if (providerCallId) {
+      await supabase.rpc("attach_provider_call", { p_call_id: callId, p_provider_call_id: providerCallId });
+    } else {
+      console.error("realtime/session: no call id in OpenAI response; server cutoff unavailable for", callId);
+    }
 
-    return NextResponse.json({ value: data.value, expiresAt: data.expires_at, callId, deadlineAt });
+    const deadlineMs = Date.now() + MAX_CALL_DURATION_SECONDS * 1000;
+    if (providerCallId) {
+      after(async () => {
+        const wait = deadlineMs + CUTOFF_GRACE_MS - Date.now();
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+        await hangupProviderCall(providerCallId);
+        await markProviderHungUp(callId);
+      });
+    }
+
+    return NextResponse.json({ answerSdp, callId, deadlineAt: new Date(deadlineMs).toISOString() });
   } catch (err) {
     console.error("realtime/session failed", err);
     await supabase.rpc("release_call_entitlement", { p_call_id: callId });
