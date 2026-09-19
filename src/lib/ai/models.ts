@@ -12,7 +12,12 @@ export const REALTIME_VOICES = {
   female: ["marin", "shimmer"],
 } as const;
 
-export function pickVoiceForGender(gender: "male" | "female"): string {
+// Deterministic per persona when a seed (the prospect's name) is given, so
+// "the same person" keeps the same voice across retries and reloads.
+export function pickVoiceForGender(gender: "male" | "female", seed?: string): string {
   const voices = REALTIME_VOICES[gender];
-  return voices[Math.floor(Math.random() * voices.length)];
+  if (!seed) return voices[Math.floor(Math.random() * voices.length)];
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return voices[hash % voices.length];
 }

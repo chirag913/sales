@@ -1,4 +1,5 @@
-import { ProspectIdentity, ProspectMarket } from "@/lib/types";
+import { getMarketConfig } from "@/lib/prospect/marketConfig";
+import { ProspectIdentity, ProspectMarket, Scenario, TrainingProfile } from "@/lib/types";
 
 const FIRST_NAMES_MALE_BY_MARKET: Record<ProspectMarket, string[]> = {
   US: [
@@ -51,33 +52,17 @@ const FIRST_NAMES_FEMALE_BY_MARKET: Record<ProspectMarket, string[]> = {
   ],
 };
 
-const LAST_NAMES = [
-  "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis",
-  "Rodriguez", "Martinez", "Chen", "Wilson", "Anderson", "Taylor", "Thomas", "Moore",
-  "Jackson", "Martin", "Lee", "Thompson", "White", "Harris", "Clark", "Lewis",
-  "Robinson", "Walker", "Young", "Allen", "King", "Wright", "Scott", "Green",
-  "Baker", "Nelson", "Carter", "Mitchell", "Roberts", "Turner", "Phillips", "Campbell",
-];
-
-const COMPANY_PREFIXES = [
-  "Meridian", "Crestline", "Harbor", "Summit", "Northgate", "Alderwood", "Bluepeak",
-  "Ridgeview", "Fairmont", "Cascade", "Ironwood", "Silverline", "Brightwater", "Highland",
-  "Sterling", "Lakeside", "Riverside", "Oakmont", "Westbrook", "Clearview", "Ashford",
-  "Bellwood", "Granite", "Hartwell",
-];
-
-const COMPANY_SUFFIXES = ["Group", "Partners", "Solutions", "Services", "Holdings", "Enterprises", "Associates", "Ventures"];
-
-const GENERIC_INDUSTRY_WORDS = ["Business", "Commercial", "Regional", "Metro", "National", "Pacific"];
-
-const TITLE_ROLE_WORDS = /\b(Manager|Director|Officer|Lead|Coordinator|Owner|Head|VP|Supervisor|Administrator|Executive|Chief)\b/gi;
-
-const GENERIC_BUSINESS_NOUNS =
-  /\b(companies|company|businesses|business|firms|firm|providers|provider|services|service|industry|industries|organizations|organization|practices|practice|brands|brand|agencies|agency|shops|shop|stores|store|retailers|retailer|contractors|contractor)\b/gi;
-
-function pickRandom<T>(items: T[]): T {
-  return items[Math.floor(Math.random() * items.length)];
-}
+// Words that describe a kind of business or a size/quality, not the
+// industry itself — dropped when turning a prospectIndustry like
+// "independent dental practices" into a company-name word like "Dental".
+const NON_INDUSTRY_WORDS = new Set([
+  "companies", "company", "businesses", "business", "firms", "firm", "providers", "provider",
+  "services", "service", "industry", "industries", "organizations", "organization", "practices",
+  "practice", "agencies", "agency", "shops", "shop", "stores", "store", "retailers", "retailer",
+  "contractors", "contractor", "brokerages", "brokerage", "operators", "operator", "teams", "team",
+  "independent", "small", "smaller", "mid-sized", "midsized", "medium", "large", "local", "regional",
+  "growing", "established", "and", "of", "the", "for", "with", "in", "based", "sized", "size",
+]);
 
 function titleCase(words: string): string {
   return words
@@ -86,37 +71,45 @@ function titleCase(words: string): string {
     .join(" ");
 }
 
-function extractIndustryWord(title: string): string | null {
-  const stripped = title
-    .replace(TITLE_ROLE_WORDS, "")
-    .replace(/\bof\b/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return stripped.length > 0 ? stripped : null;
+function pickRandom<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
 }
 
-// The ICP's industry (e.g. "commercial cleaning companies") is a much better source for the
-// company's industry word than the job title (e.g. "Operations Manager" has no industry signal
-// once role words are stripped) — using the title alone produced names like "Bellwood Operations
-// Ventures" for a cleaning-company prospect, which then made the model deny being in that industry.
-function extractIndustryWordFromService(service: string): string | null {
-  const stripped = service
-    .replace(GENERIC_BUSINESS_NOUNS, "")
-    .replace(/\bfor\b.*$/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return stripped.length > 0 ? titleCase(stripped) : null;
+// The company-name word comes from the prospect's actual industry (the
+// generated ICP / target customer) and nothing else. If nothing usable is
+// left after stripping, the company simply gets no industry word — a plain
+// "Meridian Partners" — rather than an invented or random industry.
+export function industryNameWord(prospectIndustry: string): string | null {
+  const words = prospectIndustry
+    .toLowerCase()
+    .replace(/[^a-z0-9\s&-]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 0 && !NON_INDUSTRY_WORDS.has(w));
+  if (words.length === 0) return null;
+  return titleCase(words.slice(0, 3).join(" "));
 }
 
 export type ProspectGenderPreference = "male" | "female" | "any";
 
-export function generateProspectIdentity(
-  market: ProspectMarket,
-  icpTitles: string[],
-  service: string,
-  genderPreference: ProspectGenderPreference = "any"
-): ProspectIdentity {
-  const title = icpTitles.length > 0 ? pickRandom(icpTitles) : "Manager";
+export interface GenerateProspectIdentityArgs {
+  market: ProspectMarket;
+  profile: Pick<TrainingProfile, "icpTitles" | "prospectIndustry">;
+  // The scenario this person belongs to. Its role and industry win over the
+  // profile's global ICP list so the scenario card and the identity agree.
+  scenario?: Pick<Scenario, "prospectRole" | "prospectIndustry">;
+  genderPreference?: ProspectGenderPreference;
+}
+
+export function generateProspectIdentity({
+  market,
+  profile,
+  scenario,
+  genderPreference = "any",
+}: GenerateProspectIdentityArgs): ProspectIdentity {
+  const config = getMarketConfig(market);
+  const title =
+    scenario?.prospectRole?.trim() || (profile.icpTitles.length > 0 ? pickRandom(profile.icpTitles) : "Manager");
+  const industry = scenario?.prospectIndustry?.trim() || profile.prospectIndustry?.trim() || "";
   const gender: "male" | "female" =
     genderPreference === "male" || genderPreference === "female"
       ? genderPreference
@@ -127,10 +120,12 @@ export function generateProspectIdentity(
     (gender === "male" ? FIRST_NAMES_MALE_BY_MARKET[market] : FIRST_NAMES_FEMALE_BY_MARKET[market]) ??
     (gender === "male" ? FIRST_NAMES_MALE_BY_MARKET.Other : FIRST_NAMES_FEMALE_BY_MARKET.Other);
   const firstName = pickRandom(firstNames);
-  const lastName = pickRandom(LAST_NAMES);
-  const industryWord =
-    extractIndustryWordFromService(service) ?? extractIndustryWord(title) ?? pickRandom(GENERIC_INDUSTRY_WORDS);
-  const company = `${pickRandom(COMPANY_PREFIXES)} ${industryWord} ${pickRandom(COMPANY_SUFFIXES)}`;
+  const lastName = pickRandom(config.surnames);
+  const industryWord = industry ? industryNameWord(industry) : null;
+  const company = [pickRandom(config.companyPrefixes), industryWord, pickRandom(config.companySuffixes)]
+    .filter(Boolean)
+    .join(" ");
+  const location = config.locations.length > 0 ? pickRandom(config.locations) : undefined;
 
   return {
     firstName,
@@ -139,5 +134,8 @@ export function generateProspectIdentity(
     title,
     company,
     gender,
+    industry: industry || undefined,
+    location,
+    market,
   };
 }
