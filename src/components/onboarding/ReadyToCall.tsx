@@ -11,6 +11,8 @@ interface ReadyToCallProps {
   profile: TrainingProfile;
   scenario: Scenario;
   identity: ProspectIdentity;
+  // "Work on this next" from the previous attempt, when retrying.
+  focus?: string[];
   onBack: () => void;
   onStartCall: () => void;
 }
@@ -25,7 +27,7 @@ const MARKET_LABEL: Record<string, string> = {
   Other: "Other",
 };
 
-export function ReadyToCall({ profile, scenario, identity, onBack, onStartCall }: ReadyToCallProps) {
+export function ReadyToCall({ profile, scenario, identity, focus = [], onBack, onStartCall }: ReadyToCallProps) {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col items-center justify-center px-6 py-16 text-center">
       <button
@@ -46,6 +48,11 @@ export function ReadyToCall({ profile, scenario, identity, onBack, onStartCall }
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
               {identity.title} · {identity.company}
             </p>
+            {identity.location && (
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                {identity.location.city}, {identity.location.region}
+              </p>
+            )}
           </div>
         </div>
 
@@ -54,7 +61,8 @@ export function ReadyToCall({ profile, scenario, identity, onBack, onStartCall }
             <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Target</dt>
             <dd className="flex items-center gap-1.5 text-zinc-900 dark:text-zinc-50">
               <MarketFlag market={profile.market} className="h-3.5 w-[1.3125rem] shrink-0" />
-              {MARKET_LABEL[profile.market] ?? profile.market} · {profile.service}
+              {MARKET_LABEL[profile.market] ?? profile.market}
+              {identity.industry || profile.prospectIndustry ? ` · ${identity.industry || profile.prospectIndustry}` : ""}
             </dd>
           </div>
           <div>
@@ -77,6 +85,17 @@ export function ReadyToCall({ profile, scenario, identity, onBack, onStartCall }
           )}
         </dl>
       </div>
+
+      {focus.length > 0 && (
+        <div className="mt-4 w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-left dark:border-emerald-900/50 dark:bg-emerald-950/30">
+          <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Focus for this attempt</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-emerald-800 dark:text-emerald-200">
+            {focus.map((item, i) => (
+              <li key={i}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-4 w-full rounded-2xl border border-zinc-200/70 bg-zinc-50 p-5 text-left dark:border-zinc-800 dark:bg-zinc-900/50">
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Before you start</p>
@@ -110,7 +129,10 @@ export function ReadyToCall({ profile, scenario, identity, onBack, onStartCall }
       </div>
 
       <p className="mt-4 text-xs text-zinc-400 dark:text-zinc-500">
-        Your microphone will be requested when the call starts.
+        Your microphone will be requested when the call starts. If it&apos;s blocked, no call is used.{" "}
+        <Link href="/audio-check" className="underline underline-offset-4 hover:text-zinc-600 dark:hover:text-zinc-300">
+          Check your microphone
+        </Link>
       </p>
 
       <div className="mt-8">

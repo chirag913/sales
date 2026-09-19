@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CallScreen, CallEndReason } from "@/components/call/CallScreen";
+import { CallScreen, CallEndInfo } from "@/components/call/CallScreen";
 import { ScoreScreen } from "@/components/call/ScoreScreen";
 import { HeroInput, HeroInputValue } from "@/components/onboarding/HeroInput";
 import { Paywall } from "@/components/onboarding/Paywall";
@@ -10,6 +10,7 @@ import { ReadyToCall } from "@/components/onboarding/ReadyToCall";
 import { ScenarioPicker } from "@/components/onboarding/ScenarioPicker";
 import { EntitlementStatus } from "@/lib/entitlement/types";
 import { migrateLocalDataIfNeeded } from "@/lib/profile/migrateLocalData";
+import { normalizeTrainingProfile } from "@/lib/profile/normalize";
 import { applyTrainingProfileToSalesProfile } from "@/lib/profile/sync";
 import { generateProspectIdentity, ProspectGenderPreference } from "@/lib/prospect/identity";
 import { createClient } from "@/lib/supabase/client";
@@ -29,6 +30,16 @@ import {
   TranscriptEntry,
   TrainingProfile,
 } from "@/lib/types";
+
+interface FinishedCall {
+  transcript: TranscriptEntry[];
+  durationSeconds: number;
+  callId: string;
+  info: CallEndInfo;
+  scenario: Scenario;
+  identity: ProspectIdentity;
+  trainingProfile: TrainingProfile;
+}
 
 type Step = "input" | "review" | "scenarios" | "ready" | "call" | "scoring" | "paywall";
 
@@ -53,6 +64,13 @@ export function TrainingSetup() {
   const [callTranscript, setCallTranscript] = useState<TranscriptEntry[] | null>(null);
   const [scoring, setScoring] = useState(false);
   const [scoringError, setScoringError] = useState<string | null>(null);
+  // Everything needed to score or save the finished call again without
+  // spending another call: kept until the user leaves the score screen.
+  const [finishedCall, setFinishedCall] = useState<FinishedCall | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // "Work on this next" from the last score, shown on the Ready screen for a retry.
+  const [retryFocus, setRetryFocus] = useState<string[]>([]);
   const [scoreProgress, setScoreProgress] = useState<{
     previousBestScore?: number;
     previousScore?: number;
@@ -60,21 +78,39 @@ export function TrainingSetup() {
   }>({});
   const [loaded, setLoaded] = useState(false);
 
-  // Single source of truth for "which persona goes with which scenario" —
-  // generated once per scenario batch (not per screen) so the exact same
-  // identity (name, gender, photo) flows unchanged from the ScenarioPicker
-  // card preview through Ready/Call/Score. Previously ScenarioPicker built
-  // its own copy of this map purely for card display, while this component
-  // separately called generateProspectIdentity() again on Start Practice —
-  // two independent calls producing two unrelated people.
+  // A scenario and its prospect are one unit: the identity is generated from
+  // the scenario's own role/industry when the batch is created, stored ON the
+  // scenario (and persisted with it), and read from there everywhere — the
+  // picker card, Ready, the live call and the score screen. It only changes
+  // on an explicit "fresh prospect" or a voice-preference change, never as a
+  // side effect of a re-render, a reload or a retry.
   const identities = useMemo(() => {
     const map = new Map<string, ProspectIdentity>();
-    if (!profile || !scenarios) return map;
-    for (const scenario of scenarios) {
-      map.set(scenario.id, generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
+    for (const scenario of scenarios ?? []) {
+      if (scenario.identity) map.set(scenario.id, scenario.identity);
     }
     return map;
-  }, [scenarios, profile, voicePreference]);
+  }, [scenarios]);
+
+  function newIdentityFor(scenario: Scenario, trainingProfile: TrainingProfile, preference: ProspectGenderPreference) {
+    return generateProspectIdentity({ market: trainingProfile.market, profile: trainingProfile, scenario, genderPreference: preference });
+  }
+
+  function withIdentities(batch: Scenario[], trainingProfile: TrainingProfile, preference: ProspectGenderPreference): Scenario[] {
+    return batch.map((scenario) => ({ ...scenario, identity: newIdentityFor(scenario, trainingProfile, preference) }));
+  }
+
+  function replaceScenarios(next: Scenario[]) {
+    setScenarios(next);
+    if (userId) void saveRemoteScenarios(supabase, userId, next);
+  }
+
+  function handleVoicePreferenceChange(preference: ProspectGenderPreference) {
+    setVoicePreference(preference);
+    if (!profile || !scenarios) return;
+    // Explicit user action: re-roll everyone to match the requested voice.
+    replaceScenarios(withIdentities(scenarios, profile, preference));
+  }
 
   async function refreshEntitlement(): Promise<EntitlementStatus | null> {
     try {
@@ -107,9 +143,19 @@ export function TrainingSetup() {
       setUserId(user.id);
       if (remote?.salesProfile) setSalesProfile(remote.salesProfile);
       if (remote?.trainingProfile) {
-        setProfile(remote.trainingProfile);
-        if (remote.scenarios && remote.scenarios.length > 0) {
-          setScenarios(remote.scenarios);
+        const loadedProfile = normalizeTrainingProfile(remote.trainingProfile);
+        setProfile(loadedProfile);
+        // Scenarios saved before scenarios carried a role/situation (or before
+        // the prospect industry existed) can't drive a consistent prospect, so
+        // send the user back to the review step to regenerate them rather than
+        // running a call against a half-specified persona.
+        const usableScenarios = (remote.scenarios ?? []).filter((scenario) => Boolean(scenario.prospectRole && scenario.situation));
+        if (usableScenarios.length > 0 && loadedProfile.prospectIndustry) {
+          const ready = usableScenarios.map((scenario) =>
+            scenario.identity ? scenario : { ...scenario, identity: newIdentityFor(scenario, loadedProfile, "any") }
+          );
+          setScenarios(ready);
+          if (ready.some((scenario, i) => scenario !== usableScenarios[i])) void saveRemoteScenarios(supabase, user.id, ready);
           setStep("scenarios");
         } else {
           setStep("review");
@@ -159,6 +205,10 @@ export function TrainingSetup() {
 
   async function handleConfirmProfile() {
     if (!profile) return;
+    if (!profile.prospectIndustry.trim()) {
+      setScenarioError("Add the industry you're calling (e.g. dental practices) so the prospects make sense.");
+      return;
+    }
     setScenarioError(null);
     setGeneratingScenarios(true);
     try {
@@ -172,8 +222,7 @@ export function TrainingSetup() {
         throw new Error(body?.error ?? "Failed to generate scenarios.");
       }
       const generated: Scenario[] = await res.json();
-      setScenarios(generated);
-      if (userId) void saveRemoteScenarios(supabase, userId, generated);
+      replaceScenarios(withIdentities(generated, profile, voicePreference));
       setStep("scenarios");
     } catch (err) {
       setScenarioError(err instanceof Error ? err.message : "Something went wrong.");
@@ -190,46 +239,76 @@ export function TrainingSetup() {
       return;
     }
     setSelectedScenario(scenario);
-    const identity = identities.get(scenario.id);
-    if (identity) {
-      setProspectIdentity(identity);
-    } else if (profile) {
-      // Defensive fallback only — the map above is built for every scenario
-      // in the current batch, so this shouldn't happen in practice.
-      setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
+    let identity = scenario.identity;
+    if (!identity && profile) {
+      // Defensive only: every scenario gets an identity when it's created or loaded.
+      identity = newIdentityFor(scenario, profile, voicePreference);
+      replaceScenarios((scenarios ?? []).map((s) => (s.id === scenario.id ? { ...s, identity } : s)));
     }
+    setProspectIdentity(identity ?? null);
     setStep("ready");
   }
 
   function handleBackToScenarios() {
+    setRetryFocus([]);
     setSelectedScenario(null);
     setProspectIdentity(null);
     setStep("scenarios");
   }
 
-  async function runScoring(
-    transcript: TranscriptEntry[],
-    durationSeconds: number,
-    scenario: Scenario,
-    trainingProfile: TrainingProfile,
-    callId: string,
-    reason: CallEndReason
-  ) {
+  // Persisting the call is critical (it's the user's history and what
+  // finalizes the call session), so it is awaited and its failure is shown
+  // with a retry, never swallowed.
+  async function saveCall(call: FinishedCall, result: CallScoreResult) {
+    setSaveState("saving");
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/calls/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callId: call.callId,
+          status: call.info.reason,
+          endedBy: call.info.endedBy,
+          prospectEndReason: call.info.prospectEndReason,
+          scenario: call.scenario,
+          identity: call.identity,
+          durationSeconds: call.durationSeconds,
+          result,
+          transcript: call.transcript,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? "Failed to save this call.");
+      }
+      setSaveState("saved");
+    } catch (err) {
+      setSaveState("error");
+      setSaveError(err instanceof Error ? err.message : "Failed to save this call.");
+    }
+  }
+
+  async function runScoring(call: FinishedCall) {
     setScoring(true);
     setScoringError(null);
     setScoreResult(null);
     setScoreProgress({});
+    setSaveState("idle");
+    setSaveError(null);
     try {
       const res = await fetch("/api/score/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          callId,
-          transcript,
+          callId: call.callId,
+          transcript: call.transcript,
           salesProfile,
-          trainingProfile,
-          scenario,
-          durationSeconds,
+          trainingProfile: call.trainingProfile,
+          scenario: call.scenario,
+          durationSeconds: call.durationSeconds,
+          endedBy: call.info.endedBy,
+          prospectEndReason: call.info.prospectEndReason,
         }),
       });
       if (!res.ok) {
@@ -238,6 +317,7 @@ export function TrainingSetup() {
       }
       const result: CallScoreResult = await res.json();
       setScoreResult(result);
+      setRetryFocus(result.workOnNext ?? []);
 
       // Gamification context for the score screen — the user's own past
       // scores, read-only, fetched before this call's own row is saved below
@@ -260,23 +340,9 @@ export function TrainingSetup() {
         }
       }
 
-      if (prospectIdentity) {
-        void fetch("/api/calls/save", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            callId,
-            status: reason,
-            scenario,
-            identity: prospectIdentity,
-            durationSeconds,
-            result,
-            transcript,
-          }),
-        }).catch(() => {
-          // Call storage is a non-critical enhancement — fail silently, same as coaching.
-        });
-      }
+      // Show the score now; saving continues below with its own visible status.
+      setScoring(false);
+      await saveCall(call, result);
     } catch (err) {
       setScoringError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -285,12 +351,30 @@ export function TrainingSetup() {
     }
   }
 
-  function handleCallEnded(transcript: TranscriptEntry[], durationSeconds: number, callId: string, reason: CallEndReason) {
-    if (!profile || !selectedScenario) return;
+  function handleCallEnded(transcript: TranscriptEntry[], durationSeconds: number, callId: string, info: CallEndInfo) {
+    if (!profile || !selectedScenario || !prospectIdentity) return;
+    const call: FinishedCall = {
+      transcript,
+      durationSeconds,
+      callId,
+      info,
+      scenario: selectedScenario,
+      identity: prospectIdentity,
+      trainingProfile: profile,
+    };
+    setFinishedCall(call);
     setCallDurationSeconds(durationSeconds);
     setCallTranscript(transcript);
     setStep("scoring");
-    void runScoring(transcript, durationSeconds, selectedScenario, profile, callId, reason);
+    void runScoring(call);
+  }
+
+  function handleRetryScoring() {
+    if (finishedCall) void runScoring(finishedCall);
+  }
+
+  function handleRetrySave() {
+    if (finishedCall && scoreResult) void saveCall(finishedCall, scoreResult);
   }
 
   function handleEntitlementExhausted() {
@@ -299,7 +383,12 @@ export function TrainingSetup() {
     void refreshEntitlement();
   }
 
-  async function handlePracticeAgain() {
+  // Retry the SAME scenario. "same" keeps this exact person and situation;
+  // "fresh" is an explicit request for a different person in the same
+  // scenario (its role, industry and conditions are unchanged). Neither
+  // silently switches scenarios. Goes back through the Ready screen, which
+  // is where the "work on this next" reminder is shown.
+  async function handlePracticeAgain(mode: "same" | "fresh") {
     if (!profile || !selectedScenario) return;
     const current = (await refreshEntitlement()) ?? entitlement;
     if (current && !current.canStartCall) {
@@ -307,14 +396,29 @@ export function TrainingSetup() {
       setStep("paywall");
       return;
     }
-    setProspectIdentity(generateProspectIdentity(profile.market, profile.icpTitles, profile.service, voicePreference));
+    let identity = prospectIdentity ?? selectedScenario.identity ?? null;
+    if (mode === "fresh" || !identity) {
+      identity = newIdentityFor(selectedScenario, profile, voicePreference);
+      const updated = { ...selectedScenario, identity };
+      setSelectedScenario(updated);
+      // Keep the picker and reloads in step with the person now on the phone.
+      replaceScenarios((scenarios ?? []).map((s) => (s.id === updated.id ? updated : s)));
+    }
+    setProspectIdentity(identity);
     setScoreResult(null);
     setScoringError(null);
     setCallTranscript(null);
-    setStep("call");
+    setFinishedCall(null);
+    setSaveState("idle");
+    setSaveError(null);
+    setStep("ready");
   }
 
   function handleScoreDone() {
+    setRetryFocus([]);
+    setFinishedCall(null);
+    setSaveState("idle");
+    setSaveError(null);
     setSelectedScenario(null);
     setProspectIdentity(null);
     setScoreResult(null);
@@ -364,7 +468,11 @@ export function TrainingSetup() {
         previousBestScore={scoreProgress.previousBestScore}
         previousScore={scoreProgress.previousScore}
         callNumber={scoreProgress.callNumber}
-        onPracticeAgain={() => void handlePracticeAgain()}
+        saveState={saveState}
+        saveError={saveError}
+        onRetryScoring={handleRetryScoring}
+        onRetrySave={handleRetrySave}
+        onPracticeAgain={(mode) => void handlePracticeAgain(mode)}
         onDone={handleScoreDone}
       />
     );
@@ -379,6 +487,7 @@ export function TrainingSetup() {
         identity={prospectIdentity}
         onEnd={handleCallEnded}
         onEntitlementExhausted={handleEntitlementExhausted}
+        onCancel={() => setStep("ready")}
       />
     );
   }
@@ -389,6 +498,7 @@ export function TrainingSetup() {
         profile={profile}
         scenario={selectedScenario}
         identity={prospectIdentity}
+        focus={retryFocus}
         onBack={handleBackToScenarios}
         onStartCall={() => setStep("call")}
       />
@@ -404,7 +514,7 @@ export function TrainingSetup() {
         onSelect={(scenario) => void handleSelectScenario(scenario)}
         onBack={() => setStep("review")}
         voicePreference={voicePreference}
-        onVoicePreferenceChange={setVoicePreference}
+        onVoicePreferenceChange={handleVoicePreferenceChange}
       />
     );
   }

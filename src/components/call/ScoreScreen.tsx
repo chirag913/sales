@@ -15,7 +15,11 @@ interface ScoreScreenProps {
   previousBestScore?: number;
   previousScore?: number;
   callNumber?: number;
-  onPracticeAgain: () => void;
+  saveState: "idle" | "saving" | "saved" | "error";
+  saveError: string | null;
+  onRetryScoring: () => void;
+  onRetrySave: () => void;
+  onPracticeAgain: (mode: "same" | "fresh") => void;
   onDone: () => void;
 }
 
@@ -30,6 +34,10 @@ export function ScoreScreen({
   previousBestScore,
   previousScore,
   callNumber,
+  saveState,
+  saveError,
+  onRetryScoring,
+  onRetrySave,
   onPracticeAgain,
   onDone,
 }: ScoreScreenProps) {
@@ -40,7 +48,11 @@ export function ScoreScreen({
           <>
             <p className="text-lg font-medium text-red-600 dark:text-red-400">Couldn&apos;t score this call</p>
             <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">{error}</p>
-            <div className="mt-6">
+            <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
+              Your call is kept. Trying again doesn&apos;t use another call.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <Button onClick={onRetryScoring}>Try scoring again</Button>
               <Button variant="secondary" onClick={onDone}>
                 Back to scenarios
               </Button>
@@ -69,11 +81,36 @@ export function ScoreScreen({
         callNumber={callNumber}
       />
 
-      <div className="mt-10 flex justify-center gap-3">
-        <Button variant="secondary" onClick={onDone}>
-          Back to scenarios
-        </Button>
-        <Button onClick={onPracticeAgain}>Practice Again</Button>
+      {saveState === "saving" && (
+        <p className="mt-8 text-center text-sm text-zinc-500 dark:text-zinc-400">Saving this call to your history…</p>
+      )}
+      {saveState === "error" && (
+        <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center dark:border-amber-900/50 dark:bg-amber-950/30">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">This call wasn&apos;t saved to your history.</p>
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">{saveError}</p>
+          <div className="mt-3 flex justify-center">
+            <Button variant="secondary" onClick={onRetrySave}>
+              Retry saving
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-10 flex flex-col items-center gap-3">
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">Retry this same scenario</p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Button onClick={() => onPracticeAgain("same")}>Same prospect</Button>
+          <Button variant="secondary" onClick={() => onPracticeAgain("fresh")}>
+            Fresh prospect
+          </Button>
+        </div>
+        <button
+          type="button"
+          onClick={onDone}
+          className="mt-2 text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
+        >
+          Choose a different scenario
+        </button>
       </div>
     </div>
   );

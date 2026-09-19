@@ -1,23 +1,41 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ProspectAvatar } from "@/components/ui/ProspectAvatar";
 import { CallVisual } from "@/components/call/CallVisual";
 import { CoachPanel } from "@/components/call/CoachPanel";
 import { useRealtimeCall } from "@/lib/realtime/useRealtimeCall";
+import { scorableTranscript } from "@/lib/transcript";
 import { CoachMode, CoachTip, ProspectIdentity, SalesProfile, Scenario, TranscriptEntry, TrainingProfile } from "@/lib/types";
 
 export type CallEndReason = "completed" | "timeout";
+
+export interface CallEndInfo {
+  // How the call session is finalized in the database.
+  reason: CallEndReason;
+  // Who actually ended it. The scorer uses this: a prospect hanging up is
+  // treated very differently from the caller running out the clock.
+  endedBy: "caller" | "prospect" | "timeout";
+  // The prospect's stated reason when it hung up (end_call tool).
+  prospectEndReason?: string;
+}
 
 interface CallScreenProps {
   salesProfile: SalesProfile;
   trainingProfile: TrainingProfile;
   scenario: Scenario;
   identity: ProspectIdentity;
-  onEnd: (transcript: TranscriptEntry[], durationSeconds: number, callId: string, reason: CallEndReason) => void;
+  onEnd: (transcript: TranscriptEntry[], durationSeconds: number, callId: string, info: CallEndInfo) => void;
   onEntitlementExhausted: () => void;
+  // Leave the call screen after a failure to connect (e.g. microphone blocked).
+  onCancel: () => void;
 }
+
+// Coaching is advisory and costs a model call each time, so it is throttled:
+// at most one analysis per interval, always on the latest finished
+// transcript, and never twice for the same transcript state.
+const COACH_MIN_INTERVAL_MS = 7000;
 
 const STATUS_LABEL: Record<string, string> = {
   idle: "Preparing…",
@@ -44,6 +62,7 @@ export function CallScreen({
   identity,
   onEnd,
   onEntitlementExhausted,
+  onCancel,
 }: CallScreenProps) {
   const {
     status,
@@ -52,12 +71,14 @@ export function CallScreen({
     speaking,
     start,
     stop,
+    endCall,
     userAmplitudeRef,
     prospectAmplitudeRef,
     callId,
     remainingSeconds,
     timedOut,
     entitlementExhausted,
+    prospectEnded,
   } = useRealtimeCall();
   const startedRef = useRef(false);
   const callStartRef = useRef<number | null>(null);
@@ -66,14 +87,18 @@ export function CallScreen({
   const [coachMode, setCoachMode] = useState<CoachMode>("training");
   const [coachTip, setCoachTip] = useState<CoachTip | null>(null);
   const [coachLoading, setCoachLoading] = useState(false);
-  const lastCoachedIdRef = useRef<string | null>(null);
+  const transcriptRef = useRef(transcript);
+  const lastCoachedKeyRef = useRef<string | null>(null);
+  const scheduledKeyRef = useRef<string | null>(null);
+  const lastCoachAtRef = useRef(0);
+  const coachTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const coachBusyRef = useRef(false);
 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     callStartRef.current = Date.now();
-    start({ salesProfile, trainingProfile, scenario, identity });
+    start({ trainingProfile, scenario, identity });
     return () => {
       stop();
     };
@@ -81,53 +106,90 @@ export function CallScreen({
   }, []);
 
   useEffect(() => {
-    if (coachMode === "exam") return;
-    const last = transcript[transcript.length - 1];
-    if (!last || !last.final || last.id === lastCoachedIdRef.current || coachBusyRef.current) return;
-    lastCoachedIdRef.current = last.id;
+    transcriptRef.current = transcript;
+  }, [transcript]);
 
-    const analyze = async () => {
-      if (!callId) return;
-      coachBusyRef.current = true;
-      setCoachLoading(true);
-      try {
-        const res = await fetch("/api/coach/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            callId,
-            transcript: transcript.filter((e) => e.final).slice(-20),
-            salesProfile,
-            trainingProfile,
-          }),
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as { hasTip: boolean; tip: CoachTip | null };
-        setCoachTip(data.hasTip ? data.tip : null);
-      } catch {
-        // Coaching is a non-critical enhancement — fail silently.
-      } finally {
-        coachBusyRef.current = false;
-        setCoachLoading(false);
-      }
-    };
-
-    void analyze();
-  }, [transcript, coachMode, salesProfile, trainingProfile, callId]);
+  const runCoach = useCallback(async () => {
+    coachTimerRef.current = null;
+    const finished = scorableTranscript(transcriptRef.current);
+    const last = finished[finished.length - 1];
+    if (!last || !callId || coachBusyRef.current) return;
+    const key = `${last.id}:${last.text.length}`;
+    if (key === lastCoachedKeyRef.current) return;
+    lastCoachedKeyRef.current = key;
+    lastCoachAtRef.current = Date.now();
+    coachBusyRef.current = true;
+    setCoachLoading(true);
+    try {
+      const res = await fetch("/api/coach/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callId,
+          transcript: finished.slice(-20),
+          salesProfile,
+          trainingProfile,
+          scenario,
+        }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { hasTip: boolean; tip: CoachTip | null };
+      setCoachTip(data.hasTip ? data.tip : null);
+    } catch {
+      // Coaching is a non-critical enhancement — fail silently.
+    } finally {
+      coachBusyRef.current = false;
+      setCoachLoading(false);
+    }
+  }, [callId, salesProfile, trainingProfile, scenario]);
 
   useEffect(() => {
-    if (!timedOut || endedRef.current || !callId) return;
-    endedRef.current = true;
-    const durationSeconds = Math.round((Date.now() - (callStartRef.current ?? Date.now())) / 1000);
-    // Awaited so the disconnect tone (played inside stop()'s cleanup) has
-    // time to finish before onEnd() transitions away from this screen.
-    void (async () => {
-      await stop();
-      onEnd(transcript, durationSeconds, callId, "timeout");
-    })();
-    // transcript/onEnd change every render as new deltas arrive — only re-run this when timedOut flips.
+    if (coachMode === "exam" || !callId) return;
+    const finished = scorableTranscript(transcript);
+    const last = finished[finished.length - 1];
+    if (!last) return;
+    const key = `${last.id}:${last.text.length}`;
+    // Already analysed, or already scheduled for this exact transcript state.
+    if (key === lastCoachedKeyRef.current || key === scheduledKeyRef.current) return;
+    scheduledKeyRef.current = key;
+    if (coachTimerRef.current !== null) clearTimeout(coachTimerRef.current);
+    const wait = Math.max(0, COACH_MIN_INTERVAL_MS - (Date.now() - lastCoachAtRef.current));
+    coachTimerRef.current = setTimeout(() => void runCoach(), wait);
+  }, [transcript, coachMode, callId, runCoach]);
+
+  useEffect(
+    () => () => {
+      if (coachTimerRef.current !== null) clearTimeout(coachTimerRef.current);
+    },
+    []
+  );
+
+  // The single place a call ends, whoever ends it: the caller's End Call
+  // button, the time limit, or the prospect hanging up. endCall() lets the
+  // caller's last words finish transcribing before tearing down, and hands
+  // back the settled transcript (not a snapshot captured by an earlier render).
+  const finishCall = useCallback(
+    async (info: CallEndInfo) => {
+      if (endedRef.current || !callId) return;
+      endedRef.current = true;
+      if (coachTimerRef.current !== null) clearTimeout(coachTimerRef.current);
+      const durationSeconds = Math.round((Date.now() - (callStartRef.current ?? Date.now())) / 1000);
+      const finalTranscript = await endCall();
+      onEnd(finalTranscript, durationSeconds, callId, info);
+    },
+    [callId, endCall, onEnd]
+  );
+
+  useEffect(() => {
+    if (timedOut) void finishCall({ reason: "timeout", endedBy: "timeout" });
+    // Only re-run when the flag flips; finishCall changes identity as renders happen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timedOut, callId]);
+
+  useEffect(() => {
+    if (prospectEnded) void finishCall({ reason: "completed", endedBy: "prospect", prospectEndReason: prospectEnded.reason });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prospectEnded, callId]);
 
   useEffect(() => {
     // Rare race: entitlement ran out between TrainingSetup's pre-check and this
@@ -137,14 +199,8 @@ export function CallScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entitlementExhausted]);
 
-  async function handleEndCall() {
-    if (endedRef.current || !callId) return;
-    endedRef.current = true;
-    const durationSeconds = Math.round((Date.now() - (callStartRef.current ?? Date.now())) / 1000);
-    // Awaited so the disconnect tone (played inside stop()'s cleanup) has
-    // time to finish before onEnd() transitions away from this screen.
-    await stop();
-    onEnd(transcript, durationSeconds, callId, "completed");
+  function handleEndCall() {
+    void finishCall({ reason: "completed", endedBy: "caller" });
   }
 
   const dotClass =
@@ -186,9 +242,15 @@ export function CallScreen({
             </p>
           </div>
         </div>
-        <Button variant="secondary" onClick={handleEndCall}>
-          End Call
-        </Button>
+        {status === "error" ? (
+          <Button variant="secondary" onClick={onCancel}>
+            Back
+          </Button>
+        ) : (
+          <Button variant="secondary" onClick={handleEndCall} disabled={!callId}>
+            End Call
+          </Button>
+        )}
       </div>
 
       {error && (
