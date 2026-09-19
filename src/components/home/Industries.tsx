@@ -2,9 +2,21 @@ import { RevealOnScroll } from "@/components/landing/RevealOnScroll";
 import { Section, SectionHeading } from "@/components/home/parts";
 
 const SECONDARY = [
-  { label: "Education", text: "Admission enquiries and counselling follow-ups." },
-  { label: "Healthcare", text: "Appointment and treatment enquiries." },
-  { label: "High-ticket services", text: "Consultation requests where a quick, relevant reply matters." },
+  {
+    label: "Education",
+    situation: "A prospective student comparing programs.",
+    text: "While the enquiry is still active, a timely conversation helps you understand what they're looking for and whether the program fits.",
+  },
+  {
+    label: "Healthcare",
+    situation: "An appointment or treatment enquiry.",
+    text: "A timely, relevant response helps you understand what they need and get them to the right next step.",
+  },
+  {
+    label: "High-ticket services",
+    situation: "A consultation request from someone comparing providers.",
+    text: "They may be weighing price and fit. A first conversation helps you see who is serious before your team spends time on it.",
+  },
 ];
 
 // Deliberately short: one primary market and three secondary ones. The
@@ -36,8 +48,8 @@ export function Industries() {
             {SECONDARY.map((item, i) => (
               <RevealOnScroll key={item.label} delayMs={(i + 1) * 80}>
                 <div className="h-full rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-                  <p className="font-mono text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Also</p>
-                  <h3 className="mt-2 text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{item.label}</h3>
+                  <p className="font-mono text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{item.label}</p>
+                  <h3 className="mt-2 text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{item.situation}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">{item.text}</p>
                 </div>
               </RevealOnScroll>

@@ -9,6 +9,9 @@ export function LandingFooter() {
           <Logo />
         </span>
         <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          <Link href="/about" className="hover:text-zinc-900 hover:underline dark:hover:text-zinc-50">
+            About
+          </Link>
           <Link href="/terms" className="hover:text-zinc-900 hover:underline dark:hover:text-zinc-50">
             Terms
           </Link>

@@ -97,13 +97,14 @@ export function LeadRecovery() {
           <div className="lg:sticky lg:top-28">
             <SectionHeading
               eyebrow="Lead Recovery"
-              title="Go back to the leads you've already paid for."
+              title="Your CRM may already contain people who never said no."
               description={
                 <>
-                  Your CRM may already contain hundreds or thousands of leads that were never reached, stopped responding, or
-                  weren&apos;t ready when your team called.
+                  Some never answered. Some were busy, asked to be contacted later, stopped responding, or weren&apos;t ready
+                  at the time. Some were simply forgotten.
                   <span className="mt-4 block">
-                    BetterCallz can reconnect with those prospects and identify who is still interested.
+                    Give them another conversation. BetterCallz identifies who is still interested and hands those people to
+                    your sales team.
                   </span>
                 </>
               }

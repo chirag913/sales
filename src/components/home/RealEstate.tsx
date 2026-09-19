@@ -11,7 +11,7 @@ export function RealEstate() {
       <SectionHeading
         eyebrow="Real Estate"
         title="Built for businesses where every lead matters."
-        description="A buyer who enquires about a project is often comparing several, so a fast, relevant conversation matters."
+        description="A buyer who enquires about a project is often comparing several. The first useful conversation can decide whether that lead is worth a salesperson's time."
       />
 
       <div className="mt-14 grid grid-cols-1 items-start gap-8 lg:grid-cols-5 lg:gap-12">

@@ -15,18 +15,18 @@ interface ProductCard {
 const CARDS: ProductCard[] = [
   {
     label: "Instant Lead Calling",
-    headline: "New lead? Call them in seconds.",
+    headline: "New lead? Start the conversation right away.",
     description:
-      "When a new lead comes in, BetterCallz can automatically start the conversation, qualify the prospect, and route the opportunity to your sales team.",
-    steps: ["Meta lead", "BetterCallz", "AI call", "Qualification", "Sales team"],
+      "When a new lead comes in, BetterCallz can start the first conversation before your salesperson gets to it, find out what the lead wants, and hand your team an opportunity with context.",
+    steps: ["New lead", "First conversation", "Qualification", "Sales opportunity"],
     cta: "Explore Instant Calling",
     href: "#instant-calling",
   },
   {
     label: "Lead Recovery",
     headline: "Your old leads aren't necessarily dead.",
-    description: "Reconnect with dormant, missed and uncontacted leads and find the people who are still interested.",
-    steps: ["Existing leads", "AI calling", "Conversation", "Intent", "Recovered opportunity"],
+    description: "Give your existing database a new conversation. BetterCallz finds out who is still interested and hands those people to your sales team.",
+    steps: ["Existing database", "New conversation", "Identify interest", "Sales opportunity"],
     cta: "Explore Lead Recovery",
     href: "#lead-recovery",
   },

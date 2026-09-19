@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { FounderLine } from "@/components/home/FounderSignature";
 import { HomeHero } from "@/components/home/HomeHero";
 import { HomeNav } from "@/components/home/HomeNav";
 import { Industries } from "@/components/home/Industries";
@@ -11,9 +12,9 @@ import { ProductCards } from "@/components/home/ProductCards";
 import { RealEstate } from "@/components/home/RealEstate";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 
-const TITLE = "BetterCallz — Turn Every Lead Into a Conversation";
+const TITLE = "BetterCallz — You Already Paid for the Lead";
 const DESCRIPTION =
-  "AI voice agents for businesses that want to respond to new leads faster and recover the leads they've already paid for.";
+  "Every lead costs money to acquire. BetterCallz calls new and existing leads, has the first conversation, qualifies their interest, and gives your sales team the people worth following up with.";
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
@@ -46,6 +47,7 @@ export default function HomePage() {
         <RealEstate />
         <Industries />
         <LeadCapture />
+        <FounderLine />
         <OutboundCallout />
       </main>
       <LandingFooter />

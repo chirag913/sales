@@ -5,9 +5,9 @@ import { ViewTracker } from "@/components/home/ViewTracker";
 const STEPS = [
   { n: "01", title: "Lead submits Meta form", text: "A new enquiry comes in from your ad." },
   { n: "02", title: "BetterCallz receives the lead", text: "The lead's details reach BetterCallz the moment they're submitted." },
-  { n: "03", title: "AI starts the conversation", text: "The lead gets a call, while their interest is still fresh." },
+  { n: "03", title: "AI starts the conversation", text: "The lead gets a call while their interest is at its freshest: right after the enquiry." },
   { n: "04", title: "AI qualifies intent", text: "Budget, timeline and what they're actually looking for." },
-  { n: "05", title: "Sales team receives the result", text: "A structured summary, so your team starts with context." },
+  { n: "05", title: "Sales team gets the context", text: "Not just a name and number: what they want, budget, timeline and the next step." },
 ];
 
 const MESSAGES: { from: "AI" | "LEAD"; text: string }[] = [
@@ -80,8 +80,8 @@ export function InstantCalling() {
       <ViewTracker event="instant_calling_view" />
       <SectionHeading
         eyebrow="Instant Lead Calling"
-        title="From lead to conversation in seconds."
-        description="The workflow BetterCallz is built around, from the moment a lead submits your form to the moment your team knows what to do next."
+        title="Reach the lead while they still remember enquiring."
+        description="Interest is freshest right after the enquiry, and the first conversation is where a lead becomes an opportunity or quietly doesn't. This is the workflow BetterCallz is built around: lead, conversation, qualification, context for your sales team."
       />
 
       <div className="mt-14 grid grid-cols-1 items-start gap-12 lg:grid-cols-2 lg:gap-16">

@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "BetterCallz — Turn every lead into a conversation";
+export const alt = "BetterCallz — You already paid for the lead. Make sure someone calls it.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -25,11 +25,12 @@ export default function OpenGraphImage() {
           bettercallz<span style={{ color: "#2dd4bf" }}>.</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ fontSize: 84, fontWeight: 600, lineHeight: 1.05, letterSpacing: -3, maxWidth: 960 }}>
-            Turn every lead into a conversation.
+          <div style={{ display: "flex", flexDirection: "column", fontSize: 68, fontWeight: 600, lineHeight: 1.08, letterSpacing: -2.5, maxWidth: 1056 }}>
+            <div style={{ display: "flex" }}>You already paid for the lead.</div>
+            <div style={{ display: "flex" }}>Make sure someone calls it.</div>
           </div>
-          <div style={{ marginTop: 28, fontSize: 30, color: "#a1a1aa", maxWidth: 900 }}>
-            Respond to new leads faster. Recover the ones you&apos;ve already paid for.
+          <div style={{ marginTop: 28, fontSize: 30, color: "#a1a1aa", maxWidth: 960 }}>
+            BetterCallz starts the first conversation with your new and existing leads, and hands your sales team the ones worth following up.
           </div>
         </div>
       </div>

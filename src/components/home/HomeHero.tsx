@@ -53,7 +53,7 @@ function LeadFlowVisual() {
       <div className="mt-5 border-t border-zinc-100 bg-zinc-50/60 px-5 py-4 dark:border-zinc-900 dark:bg-zinc-900/30">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Result for the sales team
+            What your sales team sees
           </span>
           <span className="rounded-md bg-teal-700 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white dark:bg-teal-400 dark:text-zinc-950">
             High intent
@@ -78,11 +78,12 @@ export function HomeHero() {
         <div className="max-w-xl text-center lg:flex-1 lg:text-left">
           <Eyebrow>BetterCallz</Eyebrow>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight text-balance text-zinc-900 dark:text-zinc-50 sm:text-5xl lg:text-[3.5rem] lg:leading-[1.05]">
-            Turn every lead into a conversation.
+            <span className="block">You already paid for the lead.</span>
+            <span className="block">Make sure someone calls it.</span>
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-zinc-500 dark:text-zinc-400">
-            AI voice agents that call, qualify and recover your leads — so your sales team can focus on the people who are
-            actually interested.
+            Every lead costs money to acquire. BetterCallz calls new and existing leads, has the first conversation,
+            qualifies their interest, and gives your sales team the people worth following up with.
           </p>
           <div className="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center lg:justify-start">
             <Link href="#get-started" className={`${PRIMARY_LINK_CLASSES} px-6 py-3 text-base`}>
