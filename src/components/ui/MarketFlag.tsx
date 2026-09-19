@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { ReactNode, useId } from "react";
 import { Globe } from "lucide-react";
 import { ProspectMarket } from "@/lib/types";
 
@@ -11,11 +11,7 @@ import { ProspectMarket } from "@/lib/types";
 // Windows) don't, and silently fall back to a blank box. Plain SVG paths
 // render identically everywhere, with no font dependency at all.
 //
-// Only the two markets PROSPECT_MARKET_OPTIONS actually offers get real
-// flag art (US, India) — "Other" and any legacy market a returning user's
-// profile might still carry (UK/Canada/Australia, no longer selectable,
-// see the ProspectMarket comment in types.ts) fall back to a plain globe
-// icon rather than drawing three more flags nobody can pick anymore.
+// US/UK/Canada/Australia get real flag art; "Other" gets a plain globe.
 
 function FlagUS({ className }: { className?: string }) {
   const clipId = useId();
@@ -46,30 +42,75 @@ function FlagUS({ className }: { className?: string }) {
   );
 }
 
-function FlagIndia({ className }: { className?: string }) {
+function FlagFrame({ className, label, children }: { className?: string; label: string; children: ReactNode }) {
   const clipId = useId();
   return (
-    <svg viewBox="0 0 30 20" className={className} role="img" aria-label="India flag">
+    <svg viewBox="0 0 30 20" className={className} role="img" aria-label={label}>
       <clipPath id={clipId}>
         <rect width="30" height="20" rx="2" />
       </clipPath>
-      <g clipPath={`url(#${clipId})`}>
-        <rect width="30" height="20" fill="#fff" />
-        <rect width="30" height="6.67" fill="#ff9933" />
-        <rect y="13.33" width="30" height="6.67" fill="#138808" />
-        <circle cx="15" cy="10" r="2.6" fill="none" stroke="#000080" strokeWidth="0.3" />
-        <circle cx="15" cy="10" r="0.4" fill="#000080" />
-        {Array.from({ length: 24 }).map((_, i) => {
-          const angle = (i * 360) / 24;
-          const rad = (angle * Math.PI) / 180;
-          const x2 = 15 + 2.6 * Math.sin(rad);
-          const y2 = 10 - 2.6 * Math.cos(rad);
-          const x1 = 15 + 0.4 * Math.sin(rad);
-          const y1 = 10 - 0.4 * Math.cos(rad);
-          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#000080" strokeWidth="0.15" />;
-        })}
-      </g>
+      <g clipPath={`url(#${clipId})`}>{children}</g>
     </svg>
+  );
+}
+
+// Union Jack in a 30x20 box (used directly for the UK, and as the canton of
+// Australia via a nested scaled <svg>).
+function UnionJack() {
+  return (
+    <>
+      <rect width="30" height="20" fill="#012169" />
+      <path d="M0 0L30 20M30 0L0 20" stroke="#fff" strokeWidth="4" />
+      <path d="M0 0L30 20M30 0L0 20" stroke="#c8102e" strokeWidth="1.6" />
+      <path d="M15 0V20M0 10H30" stroke="#fff" strokeWidth="6.5" />
+      <path d="M15 0V20M0 10H30" stroke="#c8102e" strokeWidth="4" />
+    </>
+  );
+}
+
+function FlagUK({ className }: { className?: string }) {
+  return (
+    <FlagFrame className={className} label="United Kingdom flag">
+      <UnionJack />
+    </FlagFrame>
+  );
+}
+
+function FlagCanada({ className }: { className?: string }) {
+  return (
+    <FlagFrame className={className} label="Canada flag">
+      <rect width="30" height="20" fill="#fff" />
+      <rect width="7.5" height="20" fill="#d52b1e" />
+      <rect x="22.5" width="7.5" height="20" fill="#d52b1e" />
+      <path
+        d="M15 3.2l1.3 2.6 1.6-.7-.6 4.1 1.9-1.5.5 1.2 2-.3-.9 2.8.8.5-3.7 3.1.3 1.1-3.2-.5v3.4h-.9v-3.4l-3.2.5.3-1.1-3.7-3.1.8-.5-.9-2.8 2 .3.5-1.2 1.9 1.5-.6-4.1 1.6.7z"
+        fill="#d52b1e"
+      />
+    </FlagFrame>
+  );
+}
+
+function FlagAustralia({ className }: { className?: string }) {
+  const star = (cx: number, cy: number, r: number) => {
+    const pts = Array.from({ length: 14 }, (_, i) => {
+      const rad = (i * Math.PI) / 7 - Math.PI / 2;
+      const rr = i % 2 === 0 ? r : r * 0.45;
+      return `${cx + rr * Math.cos(rad)},${cy + rr * Math.sin(rad)}`;
+    }).join(" ");
+    return <polygon points={pts} fill="#fff" />;
+  };
+  return (
+    <FlagFrame className={className} label="Australia flag">
+      <rect width="30" height="20" fill="#012169" />
+      <svg width="15" height="10" viewBox="0 0 30 20">
+        <UnionJack />
+      </svg>
+      {star(7.5, 15, 2.2)}
+      {star(22, 15.5, 1.6)}
+      {star(25.5, 8, 1.3)}
+      {star(19, 7, 1.3)}
+      {star(22, 3, 1.6)}
+    </FlagFrame>
   );
 }
 
@@ -80,6 +121,8 @@ interface MarketFlagProps {
 
 export function MarketFlag({ market, className = "h-5 w-[1.875rem]" }: MarketFlagProps) {
   if (market === "US") return <FlagUS className={className} />;
-  if (market === "India") return <FlagIndia className={className} />;
+  if (market === "UK") return <FlagUK className={className} />;
+  if (market === "Canada") return <FlagCanada className={className} />;
+  if (market === "Australia") return <FlagAustralia className={className} />;
   return <Globe className={className} aria-hidden />;
 }

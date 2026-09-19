@@ -55,30 +55,15 @@ export interface SalesProfile {
   };
 }
 
-// UK/Canada/Australia stay in the type (not just their name lists in
-// identity.ts) so a returning user's already-stored profile.market keeps
-// resolving exactly as before — real per-market names, no fallback needed.
-// They're just not offered in PROSPECT_MARKET_OPTIONS below anymore.
-export type ProspectMarket = "US" | "UK" | "Canada" | "Australia" | "India" | "Other";
+export type ProspectMarket = "US" | "UK" | "Canada" | "Australia" | "Other";
 
-// Flags render via MarketFlag (real SVG, not the 🇺🇸/🇮🇳 emoji — those
-// depend on the OS's emoji font, which many desktop browsers lack full
-// coverage for) rather than a field here.
 export const PROSPECT_MARKET_OPTIONS: { value: ProspectMarket; label: string }[] = [
   { value: "US", label: "United States" },
-  { value: "India", label: "India" },
+  { value: "UK", label: "United Kingdom" },
+  { value: "Canada", label: "Canada" },
+  { value: "Australia", label: "Australia" },
   { value: "Other", label: "Other" },
 ];
-
-export type ProspectLanguage = "english" | "hinglish";
-
-// Derived, not stored or user-selectable — India speaks Hinglish
-// automatically, every other market keeps the existing English-only
-// behavior. Deriving this from market (rather than adding a stored/
-// AI-generated field) means it can never drift out of sync with it.
-export function getProspectLanguage(market: ProspectMarket): ProspectLanguage {
-  return market === "India" ? "hinglish" : "english";
-}
 
 export type CallType = "cold" | "cold_after_outreach" | "warm";
 
@@ -153,11 +138,6 @@ export interface ProspectIdentity {
   title: string;
   company: string;
   gender: "male" | "female";
-  // Optional so a call saved before this field existed still deserializes
-  // fine from history/DB storage — ProspectAvatar's market-specific photo
-  // pool simply falls back to the general pool when it's absent, same as
-  // any other market that isn't "India".
-  market?: ProspectMarket;
 }
 
 export interface TranscriptEntry {

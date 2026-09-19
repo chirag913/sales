@@ -10,8 +10,6 @@ function marketToCountry(market: ProspectMarket): string {
       return "Canada";
     case "Australia":
       return "Australia";
-    case "India":
-      return "India";
     default:
       return "Other";
   }

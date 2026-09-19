@@ -34,15 +34,12 @@ interface ProfileReviewProps {
 
 // Plain text only — used inside <option> (native <select> options can't
 // render an SVG icon) and as the label next to the real MarketFlag icon
-// where one is shown. Covers legacy UK/Canada/Australia values too, so a
-// returning user's stored profile still displays a real name instead of
-// the raw enum value — see the ProspectMarket comment in types.ts.
+// where one is shown.
 const MARKET_LABEL: Record<string, string> = {
   US: "United States",
   UK: "United Kingdom",
   Canada: "Canada",
   Australia: "Australia",
-  India: "India",
   Other: "Other",
 };
 
@@ -370,16 +367,6 @@ export function ProfileReview({
                         {opt.label}
                       </option>
                     ))}
-                    {/* A returning user's profile can still have a market
-                        (UK/Canada/Australia) that's no longer offered above —
-                        surface it as a selectable option rather than letting
-                        the select silently show nothing selected. Disappears
-                        on its own once they pick one of the current options. */}
-                    {!PROSPECT_MARKET_OPTIONS.some((opt) => opt.value === (draft.market ?? profile.market)) && (
-                      <option value={draft.market ?? profile.market}>
-                        {MARKET_LABEL[draft.market ?? profile.market] ?? (draft.market ?? profile.market)}
-                      </option>
-                    )}
                   </select>
                   <EditActions
                     onSave={() => saveEdit({ market: draft.market ?? profile.market }, ["market"])}

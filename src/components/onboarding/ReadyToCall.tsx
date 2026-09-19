@@ -16,15 +16,12 @@ interface ReadyToCallProps {
 }
 
 // Plain text only — the icon rendered next to it is the real MarketFlag
-// SVG (not emoji, see MarketFlag.tsx). Covers legacy UK/Canada/Australia
-// values too, so a returning user's stored profile still shows a real
-// name — see the ProspectMarket comment in types.ts.
+// SVG (not emoji, see MarketFlag.tsx).
 const MARKET_LABEL: Record<string, string> = {
   US: "United States",
   UK: "United Kingdom",
   Canada: "Canada",
   Australia: "Australia",
-  India: "India",
   Other: "Other",
 };
 

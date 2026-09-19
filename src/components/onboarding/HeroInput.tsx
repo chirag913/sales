@@ -77,21 +77,21 @@ export function HeroInput({ onSubmit, loading, error }: HeroInputProps) {
 
         <div className="mt-5">
           <span className="mb-2 block text-sm font-medium text-zinc-500 dark:text-zinc-400">Prospect market</span>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {PROSPECT_MARKET_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => setMarket(opt.value)}
                 aria-pressed={market === opt.value}
-                className={`flex flex-col items-center gap-1.5 rounded-xl border px-3 py-4 transition-colors ${
+                className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-4 transition-colors ${
                   market === opt.value
                     ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
                     : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:border-zinc-500"
                 }`}
               >
                 <MarketFlag market={opt.value} className="h-6 w-9" />
-                <span className="text-sm font-medium">{opt.label}</span>
+                <span className="text-center text-sm font-medium">{opt.label}</span>
               </button>
             ))}
           </div>
