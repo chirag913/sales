@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { TrackedLink } from "@/components/home/TrackedLink";
 import { Logo } from "@/components/ui/Logo";
 
-export function LandingFooter() {
+// `hideOutbound` drops the Outbound link on /outbound itself, where it would point back at the current page.
+export function LandingFooter({ hideOutbound = false }: { hideOutbound?: boolean }) {
   return (
     <footer className="border-t border-zinc-200/70 py-10 dark:border-zinc-800">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-6 font-mono text-xs text-zinc-500 dark:text-zinc-400 sm:flex-row sm:justify-between">
@@ -21,6 +23,16 @@ export function LandingFooter() {
           <Link href="/refund" className="hover:text-zinc-900 hover:underline dark:hover:text-zinc-50">
             Refund Policy
           </Link>
+          {!hideOutbound && (
+            <TrackedLink
+              href="/outbound"
+              event="outbound_clicked"
+              eventProps={{ from: "footer" }}
+              className="hover:text-zinc-900 hover:underline dark:hover:text-zinc-50"
+            >
+              Outbound
+            </TrackedLink>
+          )}
           <a href="mailto:hello@bettercallz.com" className="hover:text-zinc-900 hover:underline dark:hover:text-zinc-50">
             hello@bettercallz.com
           </a>

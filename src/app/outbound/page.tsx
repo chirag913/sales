@@ -36,7 +36,7 @@ export default function OutboundPage() {
       <WhoItsFor />
       <HowItWorks />
       <Pricing />
-      <LandingFooter />
+      <LandingFooter hideOutbound />
     </div>
   );
 }

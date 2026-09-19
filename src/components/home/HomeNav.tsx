@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
-import { TrackedLink } from "@/components/home/TrackedLink";
 import { Logo } from "@/components/ui/Logo";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { PRIMARY_LINK_CLASSES } from "@/components/ui/linkButtonClasses";
@@ -117,9 +116,6 @@ export function HomeNav() {
 
         <nav aria-label="Main" className="hidden items-center gap-7 lg:flex">
           <Dropdown label="Products" items={PRODUCTS} />
-          <TrackedLink href="/outbound" event="outbound_clicked" eventProps={{ from: "nav" }} className={LINK}>
-            Outbound
-          </TrackedLink>
           <Dropdown label="Use Cases" items={USE_CASES} />
         </nav>
 
@@ -147,14 +143,11 @@ export function HomeNav() {
       {mobileOpen && (
         <nav id="mobile-menu" aria-label="Mobile" className="border-t border-zinc-200/70 bg-white px-6 pb-6 pt-4 dark:border-zinc-800 dark:bg-black lg:hidden">
           <div className="flex flex-col gap-1">
-            {[...PRODUCTS, { label: "Outbound", href: "/outbound" }, ...USE_CASES].map((item) => (
+            {[...PRODUCTS, ...USE_CASES].map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => {
-                  setMobileOpen(false);
-                  if (item.href === "/outbound") trackEvent("outbound_clicked", { from: "mobile_nav" });
-                }}
+                onClick={() => setMobileOpen(false)}
                 className="rounded-lg px-2 py-3 text-base text-zinc-800 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-900"
               >
                 {item.label}
