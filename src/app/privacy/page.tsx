@@ -2,7 +2,7 @@ import { LegalPageLayout } from "@/components/legal/LegalPageLayout";
 
 export default function PrivacyPage() {
   return (
-    <LegalPageLayout title="Privacy Policy" updated="August 26, 2026">
+    <LegalPageLayout title="Privacy Policy" updated="September 19, 2026">
       <p>
         BetterCallz (&ldquo;BetterCallz&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) is a unit of Chirag Digital Pvt Ltd.
         This Privacy Policy explains what information we collect, how we use it, and who we share it with when you use
@@ -20,6 +20,13 @@ export default function PrivacyPage() {
         prospect&apos;s voice and responses, and the resulting scores and coaching feedback.
       </p>
       <p>
+        <strong>Website enquiries:</strong> if you submit the form on our home page, we collect the details you enter
+        (your name, business name, phone or WhatsApp number, what your business sells, your approximate monthly lead
+        volume, where your leads come from, and whether you asked for a custom AI call or to talk to our team), along
+        with the page you submitted from and any campaign (UTM) parameters in the link you used. We use this only to
+        respond to your request, and we may contact you by phone or WhatsApp about it.
+      </p>
+      <p>
         <strong>Payment information:</strong> if you purchase credits, payment processing is handled entirely by
         Razorpay. We receive confirmation that a payment succeeded and a reference id &mdash; we do not receive or
         store your card details.
@@ -35,6 +42,7 @@ export default function PrivacyPage() {
         <li>To enforce free-trial and credit limits.</li>
         <li>To process payments and prevent fraud.</li>
         <li>To communicate with you about your account (e.g. email confirmation, important notices).</li>
+        <li>To respond to enquiries submitted through our website.</li>
         <li>To maintain and improve the Service&apos;s reliability and quality.</li>
       </ul>
 
@@ -46,13 +54,16 @@ export default function PrivacyPage() {
           the AI prospect&apos;s responses, coaching, and scoring.
         </li>
         <li>
-          <strong>Supabase</strong> &mdash; hosts our database and handles authentication.
+          <strong>Supabase</strong> &mdash; hosts our database (including website enquiries) and handles authentication.
         </li>
         <li>
           <strong>Razorpay</strong> &mdash; processes credit pack payments.
         </li>
       </ul>
-      <p>We do not sell your personal information to third parties.</p>
+      <p>
+        Website enquiries may also be passed to the internal tools our team uses to manage and follow up on them (for
+        example a spreadsheet or messaging tool). We do not sell your personal information to third parties.
+      </p>
 
       <h2>4. Data retention</h2>
       <p>
