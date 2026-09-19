@@ -2,6 +2,7 @@ import {
   BetterResponseMoment,
   CallMetrics,
   CallScoreCategory,
+  ObjectiveOutcome,
   ProspectIdentity,
   Scenario,
   TranscriptEntry,
@@ -22,4 +23,12 @@ export interface CallHistoryEntry {
   better_responses: BetterResponseMoment[];
   transcript: TranscriptEntry[];
   objection_tags: string[];
+  // Objective outcome, "work on next" and how the call ended. Null on calls
+  // saved before migration 0018 added the column.
+  extra: {
+    objectiveOutcome: ObjectiveOutcome | null;
+    workOnNext: string[];
+    endedBy: string;
+    prospectEndReason: string | null;
+  } | null;
 }

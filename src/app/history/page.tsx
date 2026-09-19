@@ -15,7 +15,7 @@ export default async function HistoryPage() {
   const { data, error } = await supabase
     .from("calls")
     .select(
-      "id, created_at, scenario, identity, duration_seconds, overall_score, categories, metrics, biggest_mistake, best_moment, better_responses, transcript, objection_tags"
+      "id, created_at, scenario, identity, duration_seconds, overall_score, categories, metrics, biggest_mistake, best_moment, better_responses, transcript, objection_tags, extra"
     )
     .order("created_at", { ascending: false })
     .limit(50);

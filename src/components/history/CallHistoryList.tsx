@@ -34,6 +34,8 @@ function toResult(call: CallHistoryEntry): CallScoreResult {
     biggestMistake: call.biggest_mistake,
     bestMoment: call.best_moment,
     betterResponses: call.better_responses,
+    objectiveOutcome: call.extra?.objectiveOutcome ?? undefined,
+    workOnNext: call.extra?.workOnNext,
   };
 }
 

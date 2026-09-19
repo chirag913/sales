@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ChevronDown, ChevronUp, Trophy } from "lucide-react";
 import { Chip } from "@/components/ui/Chip";
 import { ProspectAvatar } from "@/components/ui/ProspectAvatar";
 import { ScoreGauge } from "@/components/ui/ScoreGauge";
-import { BetterResponseMoment, CallScoreResult, ProspectIdentity, Scenario, TranscriptEntry } from "@/lib/types";
+import { CallScoreCategory, CallScoreResult, ObjectiveOutcomeStatus, ProspectIdentity, Scenario, TranscriptEntry } from "@/lib/types";
 
 interface CallResultDetailProps {
   scenario: Pick<Scenario, "name">;
@@ -40,77 +40,62 @@ function categoryBarColor(score: number): string {
   return "bg-red-500";
 }
 
-// Second layer of defense against repetitive AI text (the first is the
-// dedup instruction in score.ts's SYSTEM_PROMPT). Even with that prompt in
-// place, a betterResponses moment can still end up describing the same
-// moment as biggestMistake or the objection-handling category's reason —
-// this drops those restatements client-side, keeping the shorter/more
-// actionable version (biggestMistake, or the category card) on screen
-// instead of showing the same point twice.
-const STOP_WORDS = new Set([
-  "about",
-  "after",
-  "again",
-  "because",
-  "before",
-  "being",
-  "could",
-  "didn't",
-  "doesn't",
-  "during",
-  "should",
-  "their",
-  "there",
-  "these",
-  "they're",
-  "this",
-  "though",
-  "through",
-  "very",
-  "were",
-  "what",
-  "when",
-  "which",
-  "while",
-  "with",
-  "would",
-  "your",
-]);
+const MAX_BETTER_RESPONSES = 3;
 
-function significantWords(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .split(/\s+/)
-      .filter((word) => word.length > 4 && !STOP_WORDS.has(word)),
+const OUTCOME_STYLE: Record<ObjectiveOutcomeStatus, { label: string; className: string }> = {
+  achieved: { label: "Achieved", className: "text-emerald-600 dark:text-emerald-400" },
+  partially_achieved: { label: "Partly achieved", className: "text-amber-600 dark:text-amber-400" },
+  not_achieved: { label: "Not achieved", className: "text-red-600 dark:text-red-400" },
+  not_reachable: { label: "Not realistically reachable on this call", className: "text-zinc-600 dark:text-zinc-300" },
+};
+
+function FeedbackLine({ label, children }: { label: string; children: string }) {
+  return (
+    <div>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">{label}</p>
+      <p className="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300">{children}</p>
+    </div>
   );
 }
 
-function overlapRatio(a: string, b: string): number {
-  const wordsA = significantWords(a);
-  const wordsB = significantWords(b);
-  if (wordsA.size === 0 || wordsB.size === 0) return 0;
-  let shared = 0;
-  for (const word of wordsA) if (wordsB.has(word)) shared++;
-  return shared / Math.min(wordsA.size, wordsB.size);
-}
-
-const DUPLICATE_OVERLAP_THRESHOLD = 0.5;
-const MAX_BETTER_RESPONSES = 3;
-
-function dedupeBetterResponses(betterResponses: BetterResponseMoment[], anchors: string[]): BetterResponseMoment[] {
-  const meaningfulAnchors = anchors.map((a) => a.trim()).filter((a) => a.length > 0);
-
-  const kept = betterResponses.filter((moment) => {
-    const momentText = `${moment.whatHappened} ${moment.whyItsBetter}`;
-    return !meaningfulAnchors.some((anchor) => overlapRatio(momentText, anchor) >= DUPLICATE_OVERLAP_THRESHOLD);
-  });
-
-  // Never drop every moment — fall back to the first if dedup was too
-  // aggressive, so "Better responses" isn't empty when there's real content.
-  const deduped = kept.length > 0 ? kept : betterResponses.slice(0, 1);
-  return deduped.slice(0, MAX_BETTER_RESPONSES);
+// One category: score bar, plus what happened / why it mattered / what to
+// change / a better example. Calls scored before the richer feedback existed
+// only have `reason` and `betterApproach`; the two new fields simply don't render.
+function CategoryCard({ category, defaultOpen }: { category: CallScoreCategory; defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-2xl border border-zinc-200/70 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-4 p-4 text-left"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{category.name}</p>
+            <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">{category.score}/10</p>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-900">
+            <div className={`h-full rounded-full ${categoryBarColor(category.score)}`} style={{ width: `${category.score * 10}%` }} />
+          </div>
+        </div>
+        {open ? (
+          <ChevronUp className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden />
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden />
+        )}
+      </button>
+      {open && (
+        <div className="flex flex-col gap-3 border-t border-zinc-100 px-4 pb-4 pt-3 dark:border-zinc-900">
+          {category.reason && <FeedbackLine label="What happened">{category.reason}</FeedbackLine>}
+          {category.whyItMattered && <FeedbackLine label="Why it mattered">{category.whyItMattered}</FeedbackLine>}
+          {category.betterApproach && <FeedbackLine label="What to change">{category.betterApproach}</FeedbackLine>}
+          {category.betterExample && <FeedbackLine label="Better example">{`“${category.betterExample.replace(/^["“]|["”]$/g, "")}”`}</FeedbackLine>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // The shared score/debrief rendering used both right after a call
@@ -136,15 +121,19 @@ export function CallResultDetail({
   const isNewBest = previousBestScore !== undefined && result.overallScore > previousBestScore;
   const delta = previousScore !== undefined ? result.overallScore - previousScore : null;
 
-  const objectionCategory = result.categories.find((c) => c.name === "Objection handling");
+  // Repetition is handled where the feedback is generated (see the "give each
+  // moment one home" rule in src/lib/ai/score.ts), not patched up here.
+  const betterResponses = result.betterResponses.slice(0, MAX_BETTER_RESPONSES);
 
-  const betterResponses = useMemo(
-    () => dedupeBetterResponses(result.betterResponses, [result.biggestMistake, objectionCategory?.reason ?? ""]),
-    [result.betterResponses, result.biggestMistake, objectionCategory],
+  const hasObjectionsSection = (objectionTags && objectionTags.length > 0) || result.metrics.objectionCount > 0;
+
+  // The two weakest categories start open; the rest are one click away.
+  const weakestNames = new Set(
+    [...result.categories]
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 2)
+      .map((c) => c.name)
   );
-
-  const hasObjectionsSection =
-    (objectionTags && objectionTags.length > 0) || Boolean(objectionCategory) || result.metrics.objectionCount > 0;
 
   return (
     <div>
@@ -192,23 +181,32 @@ export function CallResultDetail({
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {result.objectiveOutcome && (
+        <div className="mb-4 rounded-2xl border border-zinc-200/70 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Call objective</p>
+          <p className="mt-1 text-sm">
+            <span className={`font-semibold ${OUTCOME_STYLE[result.objectiveOutcome.status].className}`}>
+              {OUTCOME_STYLE[result.objectiveOutcome.status].label}
+            </span>
+            <span className="text-zinc-600 dark:text-zinc-400"> — {result.objectiveOutcome.reason}</span>
+          </p>
+        </div>
+      )}
+
+      {result.workOnNext && result.workOnNext.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+          <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Work on this next</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-emerald-800 dark:text-emerald-200">
+            {result.workOnNext.map((item, i) => (
+              <li key={i}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
         {result.categories.map((cat) => (
-          <div
-            key={cat.name}
-            className="rounded-2xl border border-zinc-200/70 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{cat.name}</p>
-              <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">{cat.score}/10</p>
-            </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-900">
-              <div
-                className={`h-full rounded-full ${categoryBarColor(cat.score)}`}
-                style={{ width: `${cat.score * 10}%` }}
-              />
-            </div>
-          </div>
+          <CategoryCard key={cat.name} category={cat} defaultOpen={weakestNames.has(cat.name)} />
         ))}
       </div>
 
@@ -252,15 +250,6 @@ export function CallResultDetail({
               <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
                 {result.metrics.objectionsHandled}/{result.metrics.objectionCount} handled
               </p>
-
-              {objectionCategory && (
-                <>
-                  <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{objectionCategory.reason}</p>
-                  <p className="mt-1.5 text-xs text-zinc-400 dark:text-zinc-500">
-                    Better approach: {objectionCategory.betterApproach}
-                  </p>
-                </>
-              )}
             </div>
           )}
 
