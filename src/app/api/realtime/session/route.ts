@@ -9,12 +9,16 @@ import { checkRateLimit } from "@/lib/supabase/rateLimit";
 import { createClient } from "@/lib/supabase/server";
 import { ProspectIdentity, Scenario, TrainingProfile } from "@/lib/types";
 
-// The scheduled cutoff below (after()) keeps this invocation alive until the
-// call's deadline. On hosts that cap function duration, the cap must be at
-// least MAX_CALL_DURATION_SECONDS plus the grace period; hosts that don't
-// enforce one (a plain `next start`) ignore this. The backstop reaper
-// (reapExpiredCalls) covers the case where the host kills it earlier.
-export const maxDuration = 330;
+// The scheduled cutoff below (after()) keeps this invocation alive until it is
+// time to hang the call up. 300s is the longest a Vercel function may run on
+// the plans this app is deployed on (a higher value makes the DEPLOY fail even
+// though the build passes), so the cutoff is scheduled to fire inside that
+// window (see hangupAt below) and the backstop reaper (reapExpiredCalls, run
+// on later requests) covers anything the platform ends earlier.
+export const maxDuration = 300;
+
+// Leave a few seconds of headroom before the platform's own limit.
+const FUNCTION_LIMIT_MS = maxDuration * 1000 - 3_000;
 
 const OPENAI_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 
@@ -24,6 +28,7 @@ const OPENAI_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 // call up itself when the time cap is reached (a modified client can no
 // longer keep the session alive by ignoring its own countdown).
 export async function POST(req: NextRequest) {
+  const requestStartedAt = Date.now();
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getClaims();
   const userId = authData?.claims?.sub;
@@ -118,8 +123,13 @@ export async function POST(req: NextRequest) {
 
     const deadlineMs = Date.now() + MAX_CALL_DURATION_SECONDS * 1000;
     if (providerCallId) {
+      // The call is capped at MAX_CALL_DURATION_SECONDS plus a grace period, but
+      // this function can't outlive its own limit, so the hangup fires at
+      // whichever comes first. That can be up to a few seconds before the
+      // client's own countdown ends; the reaper backstop handles the rest.
+      const hangupAt = Math.min(deadlineMs + CUTOFF_GRACE_MS, requestStartedAt + FUNCTION_LIMIT_MS);
       after(async () => {
-        const wait = deadlineMs + CUTOFF_GRACE_MS - Date.now();
+        const wait = hangupAt - Date.now();
         if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
         await hangupProviderCall(providerCallId);
         await markProviderHungUp(callId);
