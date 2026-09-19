@@ -10,11 +10,25 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --stage-idle: #a1a1aa;
+  --stage-active: #0f766e;
+  --stage-dot-idle: #e4e4e7;
+  --stage-dot-active: #0d9488;
+  --dot-grid: rgba(0, 0, 0, 0.07);
 }
 
 :root.dark {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --stage-idle: #71717a;
+  --stage-active: #5eead4;
+  --stage-dot-idle: #27272a;
+  --stage-dot-active: #2dd4bf;
+  --dot-grid: rgba(255, 255, 255, 0.08);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 @theme inline {
@@ -66,6 +80,48 @@ body {
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.04),
     0 20px 60px -20px rgba(0, 0, 0, 0.15);
+}
+
+/* Hero lead-flow visual. Each of the 5 stages lights up in order over one
+   12s loop, then the loop resets. The BASE style of .stage-label/.stage-dot is
+   the lit state, so under prefers-reduced-motion (which collapses animations
+   to their end state) the visual shows all five stages complete instead of an
+   empty diagram. It illustrates a sequence; it does not track anything real. */
+.stage-label {
+  color: var(--stage-active);
+}
+.stage-dot {
+  background-color: var(--stage-dot-active);
+  border-color: var(--stage-dot-active);
+}
+.stage-1 { animation: stage-1 12s ease-in-out infinite; }
+.stage-2 { animation: stage-2 12s ease-in-out infinite; }
+.stage-3 { animation: stage-3 12s ease-in-out infinite; }
+.stage-4 { animation: stage-4 12s ease-in-out infinite; }
+.stage-5 { animation: stage-5 12s ease-in-out infinite; }
+.stage-dot.stage-1 { animation-name: dot-1; }
+.stage-dot.stage-2 { animation-name: dot-2; }
+.stage-dot.stage-3 { animation-name: dot-3; }
+.stage-dot.stage-4 { animation-name: dot-4; }
+.stage-dot.stage-5 { animation-name: dot-5; }
+
+@keyframes stage-1 { 0%, 4% { color: var(--stage-idle); } 8%, 92% { color: var(--stage-active); } 97%, 100% { color: var(--stage-idle); } }
+@keyframes stage-2 { 0%, 18% { color: var(--stage-idle); } 22%, 92% { color: var(--stage-active); } 97%, 100% { color: var(--stage-idle); } }
+@keyframes stage-3 { 0%, 32% { color: var(--stage-idle); } 36%, 92% { color: var(--stage-active); } 97%, 100% { color: var(--stage-idle); } }
+@keyframes stage-4 { 0%, 46% { color: var(--stage-idle); } 50%, 92% { color: var(--stage-active); } 97%, 100% { color: var(--stage-idle); } }
+@keyframes stage-5 { 0%, 60% { color: var(--stage-idle); } 64%, 92% { color: var(--stage-active); } 97%, 100% { color: var(--stage-idle); } }
+@keyframes dot-1 { 0%, 4% { background-color: var(--stage-dot-idle); border-color: var(--stage-dot-idle); } 8%, 92% { background-color: var(--stage-dot-active); border-color: var(--stage-dot-active); } 97%, 100% { background-color: var(--stage-dot-idle); border-color: var(--stage-dot-idle); } }
+@keyframes dot-2 { 0%, 18% { background-color: var(--stage-dot-idle); border-color: var(--stage-dot-idle); } 22%, 92% { background-color: var(--stage-dot-active); border-color: var(--stage-dot-active); } 97%, 100% { background-color: var(--stage-dot-idle); border-color: var(--stage-dot-idle); } }
+@keyframes dot-3 { 0%, 32% { background-color: var(--stage-dot-idle); border-color: var(--stage-dot-idle); } 36%, 92% { background-color: var(--stage-dot-active); border-color: var(--stage-dot-active); } 97%, 100% { background-color: var(--stage-dot-idle); border-color: var(--stage-dot-idle); } }
+@keyframes dot-4 { 0%, 46% { background-color: var(--stage-dot-idle); border-color: var(--stage-dot-idle); } 50%, 92% { background-color: var(--stage-dot-active); border-color: var(--stage-dot-active); } 97%, 100% { background-color: var(--stage-dot-idle); border-color: var(--stage-dot-idle); } }
+@keyframes dot-5 { 0%, 60% { background-color: var(--stage-dot-idle); border-color: var(--stage-dot-idle); } 64%, 92% { background-color: var(--stage-dot-active); border-color: var(--stage-dot-active); } 97%, 100% { background-color: var(--stage-dot-idle); border-color: var(--stage-dot-idle); } }
+
+/* A very quiet dot grid behind the hero, faded out toward the edges. */
+.bg-dot-grid {
+  background-image: radial-gradient(var(--dot-grid) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 75%);
 }
 
 .reveal {

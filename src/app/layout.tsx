@@ -13,10 +13,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Canonical/OG URLs resolve against this. Set NEXT_PUBLIC_SITE_URL per
+// environment; the fallback is the production domain.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://bettercallz.com";
+
+// Site-wide defaults. Pages that need their own title (the home page and
+// /outbound) set it explicitly; every other page gets "<page> | BetterCallz".
 export const metadata: Metadata = {
-  title: "bettercallz — Practice cold calls before the real ones",
+  metadataBase: new URL(SITE_URL),
+  title: { default: "BetterCallz", template: "%s | BetterCallz" },
   description:
-    "Tell us who you're calling, then talk to a realistic AI prospect that argues back and get coached on exactly what to fix.",
+    "AI voice agents for businesses that want to respond to new leads faster and recover the leads they've already paid for.",
+  openGraph: { siteName: "BetterCallz", type: "website" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
