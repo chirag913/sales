@@ -21,9 +21,9 @@ export default async function ProfilePage() {
         </Link>
         <h1 className="mt-4 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Improve My Training</h1>
         <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          Optional. Add real company details, proof, and credibility so the AI prospect and coach can use them
-          during calls. None of this is required to start training — it will never invent clients, results, or
-          offices beyond what you enter here.
+          Optional. Add real company details, proof, and credibility so the coach and scoring can check that
+          you stay truthful on calls. None of this is required to start training — it will never invent
+          clients, results, or offices beyond what you enter here.
         </p>
         <div className="mt-8">
           <TeamSection />

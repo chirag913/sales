@@ -171,7 +171,7 @@ export function ProfileForm() {
           Just starting / new company — no clients yet
         </label>
         <FormField
-          label="US clients"
+          label="Clients in the prospect's market"
           value={profile.proof.usClients}
           onChange={(v) => update("proof", "usClients", v)}
           disabled={profile.proof.noClientsYet}
@@ -233,7 +233,7 @@ export function ProfileForm() {
 
       <FormSection
         title="Important information"
-        description='US prospects will ask "Where are you based?" or "Do you have a US office?" — the prospect agent only knows what you enter here, and will never invent an answer.'
+        description='Prospects may ask "Where are you based?" or "Do you have a local office?". The coach and scorer only know what you enter here, and will never invent an answer. (The AI prospect itself is never given these details; it only learns about you from what you say on the call.)'
       >
         <FormField
           label="Where the company is based"
@@ -241,10 +241,10 @@ export function ProfileForm() {
           onChange={(v) => update("importantInfo", "companyBasedIn", v)}
         />
         <FormField
-          label="Is there a US office?"
+          label="Local office in the prospect's country?"
           value={profile.importantInfo.hasUSOffice}
           onChange={(v) => update("importantInfo", "hasUSOffice", v)}
-          placeholder="e.g. No / Yes, in Austin, TX"
+          placeholder="e.g. No / Yes, in Austin, TX (for US prospects)"
         />
         <FormField
           label="Where the team is located"

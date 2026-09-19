@@ -57,7 +57,7 @@ export function HeroInput({ onSubmit, loading, error }: HeroInputProps) {
           ref={descriptionRef}
           className={`${textareaClasses} text-base`}
           rows={3}
-          placeholder="I want to cold call US businesses to sell commercial cleaning services."
+          placeholder="We're an appointment-setting team calling US dental practices to book demos for a patient-reminder tool."
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
@@ -69,7 +69,7 @@ export function HeroInput({ onSubmit, loading, error }: HeroInputProps) {
           <textarea
             className={`${textareaClasses} text-sm`}
             rows={2}
-            placeholder="We're based in India and want to book onsite walkthroughs."
+            placeholder="e.g. Our goal is to book a 15-minute intro call with the practice manager."
             value={context}
             onChange={(e) => setContext(e.target.value)}
           />
