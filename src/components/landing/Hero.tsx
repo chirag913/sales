@@ -10,10 +10,13 @@ export function Hero() {
           BEFORE THE REAL CALL
         </p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight text-balance text-zinc-900 dark:text-zinc-50 sm:text-5xl lg:text-[3.25rem] lg:leading-[1.08]">
-          Practice cold calls on an AI that argues back — before you call a real lead
+          Your reps shouldn&apos;t learn on your prospects.
         </h1>
         <p className="mt-6 text-lg text-zinc-500 dark:text-zinc-400">
-          Tell us who you&apos;re calling, then talk to a realistic AI prospect and get coached on exactly what to fix.
+          Practice realistic sales conversations with AI prospects before your team makes the real call.
+        </p>
+        <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+          For Indian BPOs, appointment-setting teams, agencies and sales teams selling to the US, UK, Canada and Australia.
         </p>
         <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
           <Link href="/practice" className={`${PRIMARY_LINK_CLASSES} group px-6 py-3 text-base`}>
