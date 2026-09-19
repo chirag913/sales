@@ -47,7 +47,7 @@ export async function deliverLead(lead: StoredLead): Promise<void> {
         name: sheetSafe(lead.name),
         business_name: sheetSafe(lead.businessName),
         phone: lead.phone,
-        whatsapp: lead.phone,
+        whatsapp: lead.whatsapp ?? "",
         what_they_sell: sheetSafe(lead.whatTheySell),
         monthly_leads: lead.monthlyLeads,
         lead_sources: lead.leadSources.join(", "),

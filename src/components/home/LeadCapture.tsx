@@ -55,6 +55,7 @@ interface Values {
   name: string;
   businessName: string;
   phone: string;
+  whatsapp: string;
   whatTheySell: string;
   monthlyLeads: string;
   leadSources: LeadSource[];
@@ -66,6 +67,7 @@ const EMPTY: Values = {
   name: "",
   businessName: "",
   phone: "",
+  whatsapp: "",
   whatTheySell: "",
   monthlyLeads: "",
   leadSources: [],
@@ -78,6 +80,7 @@ const FOCUS_ORDER: { field: LeadField; id: string }[] = [
   { field: "name", id: "lead-name" },
   { field: "businessName", id: "lead-business" },
   { field: "phone", id: "lead-phone" },
+  { field: "whatsapp", id: "lead-whatsapp" },
   { field: "whatTheySell", id: "lead-sells" },
   { field: "monthlyLeads", id: "lead-volume" },
   { field: "leadSources", id: "lead-source-meta_ads" },
@@ -299,6 +302,42 @@ export function LeadCapture() {
                     />
                   )}
                 </Field>
+                <Field id="lead-whatsapp" label="WhatsApp number" optional error={errors.whatsapp} hint="Only if it's different from your phone number.">
+                  {(d) => (
+                    <input
+                      id="lead-whatsapp"
+                      name="whatsapp"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="off"
+                      maxLength={30}
+                      value={values.whatsapp}
+                      onChange={(e) => set("whatsapp", e.target.value)}
+                      aria-invalid={Boolean(errors.whatsapp)}
+                      aria-describedby={d}
+                      className={FIELD}
+                    />
+                  )}
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field id="lead-sells" label="What does your business sell?" error={errors.whatTheySell}>
+                    {(d) => (
+                      <input
+                        id="lead-sells"
+                        name="what-they-sell"
+                        type="text"
+                        placeholder="e.g. Residential apartments in Pune"
+                        maxLength={LIMITS.sells.max}
+                        value={values.whatTheySell}
+                        onChange={(e) => set("whatTheySell", e.target.value)}
+                        aria-invalid={Boolean(errors.whatTheySell)}
+                        aria-describedby={d}
+                        className={FIELD}
+                      />
+                    )}
+                  </Field>
+                </div>
+                <div className="sm:col-span-2">
                 <Field id="lead-volume" label="Approximate leads per month" error={errors.monthlyLeads}>
                   {(d) => (
                     <select
@@ -321,23 +360,6 @@ export function LeadCapture() {
                     </select>
                   )}
                 </Field>
-                <div className="sm:col-span-2">
-                  <Field id="lead-sells" label="What does your business sell?" error={errors.whatTheySell}>
-                    {(d) => (
-                      <input
-                        id="lead-sells"
-                        name="what-they-sell"
-                        type="text"
-                        placeholder="e.g. Residential apartments in Pune"
-                        maxLength={LIMITS.sells.max}
-                        value={values.whatTheySell}
-                        onChange={(e) => set("whatTheySell", e.target.value)}
-                        aria-invalid={Boolean(errors.whatTheySell)}
-                        aria-describedby={d}
-                        className={FIELD}
-                      />
-                    )}
-                  </Field>
                 </div>
               </div>
 

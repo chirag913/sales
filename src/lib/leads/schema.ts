@@ -35,13 +35,17 @@ export interface LeadInput {
   name: string;
   businessName: string;
   phone: string;
+  // Optional, and only set when the visitor gave a number that differs from
+  // their phone. null means "not provided" (the phone number is then the
+  // contact number for WhatsApp too).
+  whatsapp: string | null;
   whatTheySell: string;
   monthlyLeads: MonthlyLeads;
   leadSources: LeadSource[];
   intent: LeadIntent;
 }
 
-export type LeadField = "name" | "businessName" | "phone" | "whatTheySell" | "monthlyLeads" | "leadSources" | "intent";
+export type LeadField = "name" | "businessName" | "phone" | "whatsapp" | "whatTheySell" | "monthlyLeads" | "leadSources" | "intent";
 export type LeadErrors = Partial<Record<LeadField, string>>;
 
 export type ValidationResult = { ok: true; data: LeadInput } | { ok: false; errors: LeadErrors };
@@ -109,6 +113,10 @@ export function validateLeadInput(raw: unknown): ValidationResult {
   if (!phoneRaw) errors.phone = "Please enter your phone or WhatsApp number.";
   else if (!phone) errors.phone = "That doesn't look like a valid number. Try a 10-digit mobile number.";
 
+  const whatsappRaw = cleanText(body.whatsapp, 30);
+  const whatsapp = whatsappRaw ? normalizePhone(whatsappRaw) : null;
+  if (whatsappRaw && !whatsapp) errors.whatsapp = "That doesn't look like a valid WhatsApp number. Leave it blank to use your phone number.";
+
   const whatTheySell = cleanText(body.whatTheySell, LIMITS.sells.max);
   if (whatTheySell.length < LIMITS.sells.min) errors.whatTheySell = "Tell us briefly what your business sells.";
 
@@ -140,6 +148,7 @@ export function validateLeadInput(raw: unknown): ValidationResult {
       name,
       businessName,
       phone: phone as string,
+      whatsapp,
       whatTheySell,
       monthlyLeads: monthlyLeads as MonthlyLeads,
       leadSources,

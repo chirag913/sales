@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextRequest, NextResponse, after } from "next/server";
 import { deliverLead } from "@/lib/leads/deliver";
+import { notifyNewLead } from "@/lib/leads/notify";
 import { cleanText, cleanUtm, validateLeadInput } from "@/lib/leads/schema";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
       name: lead.name,
       business_name: lead.businessName,
       phone: lead.phone,
-      whatsapp: lead.phone,
+      whatsapp: lead.whatsapp,
       what_they_sell: lead.whatTheySell,
       monthly_leads: lead.monthlyLeads,
       lead_sources: lead.leadSources,
@@ -134,8 +135,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "We couldn't save your details right now. Please try again shortly." }, { status: 500 });
   }
 
-  // Best effort, after the response: the lead is already safely stored.
-  after(() => deliverLead({ ...lead, id: inserted.id, createdAt: inserted.created_at, sourcePage, utm }));
+  // Best effort, after the response and only once the row is written: the lead
+  // is already safely stored, so neither the webhook nor the email can lose it,
+  // and neither can fail the submission (each catches and logs its own errors).
+  const stored = { ...lead, id: inserted.id, createdAt: inserted.created_at, sourcePage, utm };
+  after(async () => {
+    await Promise.allSettled([deliverLead(stored), notifyNewLead(stored)]);
+  });
 
   return OK();
 }
