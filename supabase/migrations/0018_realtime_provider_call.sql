@@ -25,6 +25,10 @@ begin
 end;
 $$;
 
+-- Supabase grants execute to anon/public by default; the function is a no-op
+-- without an authenticated user, but keep it consistent with the other
+-- sensitive functions and revoke it.
+revoke execute on function attach_provider_call(uuid, text) from public, anon;
 grant execute on function attach_provider_call(uuid, text) to authenticated;
 
 -- Extra per-call result data that did not exist when `calls` was created:
