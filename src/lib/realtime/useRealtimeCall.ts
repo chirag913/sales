@@ -1,14 +1,15 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { ProspectIdentity, SalesProfile, Scenario, TranscriptEntry, TrainingProfile } from "@/lib/types";
+import { MIC_CONSTRAINTS, NOISE_GATE_CONFIG } from "@/lib/realtime/audioConfig";
+import { END_CALL_TOOL_NAME } from "@/lib/realtime/sessionConfig";
+import { ProspectIdentity, Scenario, TranscriptEntry, TrainingProfile } from "@/lib/types";
 
 export type { TranscriptEntry };
 
 export type CallStatus = "idle" | "connecting" | "connected" | "ended" | "error";
 
 interface StartArgs {
-  salesProfile: SalesProfile;
   trainingProfile: TrainingProfile;
   scenario: Scenario;
   identity: ProspectIdentity;
@@ -24,11 +25,31 @@ interface RealtimeServerEvent {
   [key: string]: unknown;
 }
 
-function upsertUserEntry(transcript: TranscriptEntry[], id: string, text: string): TranscriptEntry[] {
+interface ResponseOutputItem {
+  id?: string;
+  type?: string;
+  status?: string;
+  name?: string;
+  call_id?: string;
+  arguments?: string;
+}
+
+export interface ProspectEnd {
+  reason: string;
+}
+
+// Transcript ordering: a caller's turn gets a placeholder entry the moment the
+// server commits their audio (input_audio_buffer.committed), which is before
+// the prospect's reply starts. Their transcription arrives later and only
+// fills in the text, so the entry keeps its place instead of being appended
+// after the prospect's reply (which is what happened when the entry was first
+// created by the transcription event).
+function upsertUserEntry(transcript: TranscriptEntry[], id: string, text: string | null): TranscriptEntry[] {
   const idx = transcript.findIndex((e) => e.id === id);
-  if (idx === -1) return [...transcript, { id, role: "user", text, final: true, timestamp: Date.now() }];
+  const finalText = text ?? "";
+  if (idx === -1) return [...transcript, { id, role: "user", text: finalText, final: text !== null, timestamp: Date.now() }];
   const next = [...transcript];
-  next[idx] = { ...next[idx], text, final: true };
+  next[idx] = { ...next[idx], text: finalText, final: true };
   return next;
 }
 
@@ -43,6 +64,25 @@ function appendProspectDelta(transcript: TranscriptEntry[], id: string, delta: s
 function finalizeEntry(transcript: TranscriptEntry[], id: string): TranscriptEntry[] {
   return transcript.map((e) => (e.id === id ? { ...e, final: true } : e));
 }
+
+// The caller cut this reply off (or the call ended mid-reply): keep it for
+// display, but flag it so it is never scored as something the caller heard.
+function markInterrupted(transcript: TranscriptEntry[], id: string): TranscriptEntry[] {
+  return transcript.map((e) => (e.id === id ? { ...e, final: true, interrupted: true } : e));
+}
+
+// How long endCall() waits for the caller's last words to be transcribed
+// before giving up. Not a fixed delay: it resolves as soon as no speech is in
+// flight and no transcription is pending; this is only the ceiling.
+const SETTLE_MAX_MS = 3500;
+// If the goodbye audio's "stopped" event never arrives, hang up this long
+// after the model finished generating the goodbye.
+const PROSPECT_END_FALLBACK_MS = 5000;
+// If the realtime session never reports ready, send the greeting anyway.
+const GREETING_FALLBACK_MS = 3000;
+// If the connection hasn't opened this long after the handshake, stop ringing
+// and say so instead of leaving the caller on a call that will never connect.
+const CONNECT_TIMEOUT_MS = 20_000;
 
 // Ring tone during "connecting" and disconnect tone on hangup — both
 // synthesized via Web Audio oscillators (same approach this file already
@@ -146,29 +186,12 @@ function playDisconnectTone(audioContext: AudioContext): void {
   );
 }
 
-// Client-side noise gate thresholds — see startAmplitudeLoop for how these
-// are used. The gate's own open/close decision is driven by an RMS reading
-// of time-domain samples (see noiseGateDataArrayRef below), NOT the
-// frequency-bin-average metric userAmplitudeRef uses for the "You" bars —
-// averaging getByteFrequencyData() across all bins is a poor loudness proxy
-// (most bins carry near-zero energy for speech, dragging the average well
-// below what real speech should read as), and was silently keeping this
-// gate closed for real speech on at least some devices — total mic silence
-// reaching OpenAI, with no error anywhere, since the gate was just doing
-// exactly what its (mis-calibrated) logic said to do. RMS of the actual
-// waveform is the standard, far more reliable "is there sound" metric.
-// OPEN_THRESHOLD is a starting guess on that RMS scale (0-1) — tune down
-// further if noise still gets through, but err toward "too easy to open"
-// over "too hard": losing the caller's voice entirely is a much worse
-// failure than a little background noise passing. HOLD_MS keeps the gate
-// open briefly after amplitude dips so a natural mid-sentence pause doesn't
-// get clipped.
-const NOISE_GATE_OPEN_THRESHOLD = 0.02;
-const NOISE_GATE_HOLD_MS = 500;
-// The "closed" state attenuates heavily rather than fully silencing (0),
-// so even a threshold that's still miscalibrated for a given mic/room can
-// never result in total voice loss — only degraded noise suppression.
-const NOISE_GATE_CLOSED_GAIN = 0.15;
+// Client-side noise gate: see NOISE_GATE_CONFIG in audioConfig.ts for what
+// the three values mean and why they are unvalidated for call-centre floors.
+// The gate's open/close decision is driven by an RMS reading of time-domain
+// samples (not the frequency-bin average userAmplitudeRef uses for the "You"
+// bars — that average is a poor loudness proxy and once kept the gate shut
+// for real speech, sending total silence to OpenAI with no error anywhere).
 
 export function useRealtimeCall() {
   const [status, setStatus] = useState<CallStatus>("idle");
@@ -179,6 +202,35 @@ export function useRealtimeCall() {
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [timedOut, setTimedOut] = useState(false);
   const [entitlementExhausted, setEntitlementExhausted] = useState(false);
+  const [prospectEnded, setProspectEnded] = useState<ProspectEnd | null>(null);
+
+  // The transcript lives in a ref as well as state so end-of-call code reads
+  // the latest entries, not the snapshot captured by whichever render
+  // scheduled it.
+  const transcriptRef = useRef<TranscriptEntry[]>([]);
+
+  // Realtime event bookkeeping (see the message handler in start()).
+  const sessionReadyRef = useRef(false);
+  const greetingSentRef = useRef(false);
+  const greetingFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callerSpokeRef = useRef(false);
+  const userSpeakingRef = useRef(false);
+  const awaitingCommitRef = useRef(false);
+  const pendingUserItemsRef = useRef<Set<string>>(new Set());
+  const settleWaitersRef = useRef<Set<() => void>>(new Set());
+  const endingRef = useRef(false);
+  const outputAudioActiveRef = useRef(false);
+  // Whether a model response is in flight. response.cancel with nothing to
+  // cancel makes the API send an error event, so it is only sent when true.
+  const responseActiveRef = useRef(false);
+  const prospectEndPendingRef = useRef<ProspectEnd | null>(null);
+  // When end_call arrives WITHOUT a spoken goodbye (observed with the live
+  // model: a function-only response), the client asks for one closing line
+  // and must not disconnect on the audio-stopped event of some EARLIER audio.
+  const closingLineRequestedRef = useRef(false);
+  const closingLineStartedRef = useRef(false);
+  const prospectEndFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const deadlineAtRef = useRef<number | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -225,6 +277,32 @@ export function useRealtimeCall() {
   // the first call's disconnect-tone delay is still relying on.
   const cleanupStartedRef = useRef(false);
 
+  const updateTranscript = useCallback((fn: (prev: TranscriptEntry[]) => TranscriptEntry[]) => {
+    transcriptRef.current = fn(transcriptRef.current);
+    setTranscript(transcriptRef.current);
+  }, []);
+
+  const sendEvent = useCallback((event: Record<string, unknown>): boolean => {
+    const dc = dcRef.current;
+    if (!dc || dc.readyState !== "open") return false;
+    dc.send(JSON.stringify(event));
+    return true;
+  }, []);
+
+  const notifySettle = useCallback(() => {
+    for (const waiter of [...settleWaitersRef.current]) waiter();
+  }, []);
+
+  // The prospect answers the phone first. Sent exactly once, and only when
+  // BOTH the call has been picked up (audio unmuted after the ring) and the
+  // realtime session has reported ready — otherwise the greeting would play
+  // into a muted element during the ring, or be sent to a session that
+  // hasn't loaded its instructions yet.
+  const maybeSendGreeting = useCallback(() => {
+    if (greetingSentRef.current || !pickupTriggeredRef.current || !sessionReadyRef.current) return;
+    if (sendEvent({ type: "response.create" })) greetingSentRef.current = true;
+  }, [sendEvent]);
+
   const startAmplitudeLoop = useCallback(() => {
     const tick = () => {
       const userAnalyser = userAnalyserRef.current;
@@ -248,11 +326,11 @@ export function useRealtimeCall() {
           const rms = Math.sqrt(sumSquares / gateData.length);
 
           const now = performance.now();
-          if (rms > NOISE_GATE_OPEN_THRESHOLD) {
+          if (rms > NOISE_GATE_CONFIG.openThreshold) {
             gate.gain.value = 1;
-            noiseGateOpenUntilRef.current = now + NOISE_GATE_HOLD_MS;
+            noiseGateOpenUntilRef.current = now + NOISE_GATE_CONFIG.holdMs;
           } else if (now > noiseGateOpenUntilRef.current) {
-            gate.gain.value = NOISE_GATE_CLOSED_GAIN;
+            gate.gain.value = NOISE_GATE_CONFIG.closedGain;
           }
         }
       } else {
@@ -318,6 +396,10 @@ export function useRealtimeCall() {
   const triggerPickup = useCallback(() => {
     if (pickupTriggeredRef.current) return;
     pickupTriggeredRef.current = true;
+    if (connectTimeoutRef.current !== null) {
+      clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
+    }
     if (pickupTimeoutRef.current !== null) {
       clearTimeout(pickupTimeoutRef.current);
       pickupTimeoutRef.current = null;
@@ -329,7 +411,19 @@ export function useRealtimeCall() {
     if (audioElRef.current) audioElRef.current.muted = false;
     wasConnectedRef.current = true;
     setStatus("connected");
-  }, [stopRingTone]);
+    // Prospect answers the phone. If the session isn't ready yet the message
+    // handler sends it the moment session.created arrives; the fallback below
+    // covers a session that never reports ready.
+    maybeSendGreeting();
+    if (!greetingSentRef.current && greetingFallbackRef.current === null) {
+      greetingFallbackRef.current = setTimeout(() => {
+        greetingFallbackRef.current = null;
+        console.warn("[realtime] session.created not seen; sending greeting anyway");
+        sessionReadyRef.current = true;
+        maybeSendGreeting();
+      }, GREETING_FALLBACK_MS);
+    }
+  }, [stopRingTone, maybeSendGreeting]);
 
   const cleanup = useCallback(async () => {
     if (cleanupStartedRef.current) return;
@@ -346,6 +440,18 @@ export function useRealtimeCall() {
     if (pickupTimeoutRef.current !== null) {
       clearTimeout(pickupTimeoutRef.current);
       pickupTimeoutRef.current = null;
+    }
+    if (greetingFallbackRef.current !== null) {
+      clearTimeout(greetingFallbackRef.current);
+      greetingFallbackRef.current = null;
+    }
+    if (connectTimeoutRef.current !== null) {
+      clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
+    }
+    if (prospectEndFallbackRef.current !== null) {
+      clearTimeout(prospectEndFallbackRef.current);
+      prospectEndFallbackRef.current = null;
     }
     stopRingTone();
 
@@ -407,40 +513,124 @@ export function useRealtimeCall() {
     countdownIntervalRef.current = setInterval(tick, 1000);
   }, []);
 
+  // The prospect decided to hang up (end_call). The spoken goodbye and the
+  // actual disconnect stay in sync: this only fires once the goodbye audio
+  // has finished playing (output_audio_buffer.stopped), or after a fallback
+  // if that event never arrives.
+  const finishProspectEnd = useCallback(() => {
+    const pending = prospectEndPendingRef.current;
+    if (!pending) return;
+    prospectEndPendingRef.current = null;
+    if (prospectEndFallbackRef.current !== null) {
+      clearTimeout(prospectEndFallbackRef.current);
+      prospectEndFallbackRef.current = null;
+    }
+    setProspectEnded(pending);
+  }, []);
+
+  const handleResponseDone = useCallback(
+    (event: RealtimeServerEvent) => {
+      const response = event.response as { output?: ResponseOutputItem[] } | undefined;
+      for (const item of response?.output ?? []) {
+        if (item.type === "message" && item.id && item.status && item.status !== "completed") {
+          // Cancelled/incomplete: the caller talked over it. Some of the text
+          // was generated but never heard.
+          const id = item.id;
+          updateTranscript((prev) => markInterrupted(prev, id));
+        }
+        if (item.type === "function_call" && item.name === END_CALL_TOOL_NAME) {
+          if (!callerSpokeRef.current || endingRef.current) {
+            // Ignore a hang-up before the prospect has even heard the caller,
+            // and tell the model so it carries on rather than waiting.
+            if (item.call_id) {
+              sendEvent({
+                type: "conversation.item.create",
+                item: { type: "function_call_output", call_id: item.call_id, output: JSON.stringify({ ok: false, error: "too_early" }) },
+              });
+            }
+            continue;
+          }
+          let reason = "other";
+          try {
+            reason = (JSON.parse(item.arguments ?? "{}") as { reason?: string }).reason ?? "other";
+          } catch {
+            // malformed arguments: keep the default reason
+          }
+          prospectEndPendingRef.current = { reason };
+
+          const spokeGoodbye = (response?.output ?? []).some((o) => o.type === "message");
+          if (!spokeGoodbye && item.call_id) {
+            // The model hung up without saying anything. Ask for one short
+            // closing line so the caller isn't cut off in silence, and wait
+            // for THAT audio before disconnecting.
+            closingLineRequestedRef.current = true;
+            closingLineStartedRef.current = false;
+            sendEvent({
+              type: "conversation.item.create",
+              item: { type: "function_call_output", call_id: item.call_id, output: JSON.stringify({ ok: true }) },
+            });
+            sendEvent({
+              type: "response.create",
+              response: {
+                instructions:
+                  "You are ending the phone call now. Say ONE short, natural closing line in your own words as the person you are on this call (a few words, like a brief goodbye), then stop. Do not call any function.",
+              },
+            });
+            prospectEndFallbackRef.current = setTimeout(finishProspectEnd, PROSPECT_END_FALLBACK_MS + 2000);
+          } else if (!outputAudioActiveRef.current) {
+            // Goodbye already finished playing: hang up after a short beat.
+            prospectEndFallbackRef.current = setTimeout(finishProspectEnd, 600);
+          } else {
+            prospectEndFallbackRef.current = setTimeout(finishProspectEnd, PROSPECT_END_FALLBACK_MS);
+          }
+        }
+      }
+    },
+    [finishProspectEnd, sendEvent, updateTranscript]
+  );
+
   const start = useCallback(
-    async ({ salesProfile, trainingProfile, scenario, identity }: StartArgs) => {
+    async ({ trainingProfile, scenario, identity }: StartArgs) => {
       setError(null);
       setStatus("connecting");
+      transcriptRef.current = [];
       setTranscript([]);
       setCallId(null);
       setRemainingSeconds(null);
       setTimedOut(false);
       setEntitlementExhausted(false);
+      setProspectEnded(null);
       cleanupStartedRef.current = false;
       wasConnectedRef.current = false;
       pickupTriggeredRef.current = false;
+      sessionReadyRef.current = false;
+      greetingSentRef.current = false;
+      callerSpokeRef.current = false;
+      userSpeakingRef.current = false;
+      awaitingCommitRef.current = false;
+      pendingUserItemsRef.current = new Set();
+      endingRef.current = false;
+      outputAudioActiveRef.current = false;
+      responseActiveRef.current = false;
+      prospectEndPendingRef.current = null;
+      closingLineRequestedRef.current = false;
+      closingLineStartedRef.current = false;
 
       try {
-        // Created and started before the token fetch below — rings
-        // immediately rather than after a network round trip. The rest of
-        // this call's audio (amplitude analysis, noise gate) reuses this
-        // same AudioContext once the connection is actually set up.
+        // Created and started first — rings immediately, and the rest of this
+        // call's audio (amplitude analysis, noise gate) reuses this same
+        // AudioContext once the connection is set up.
         //
         // `let`, not `const`: in dev mode, React StrictMode's mount→cleanup→
         // remount dance runs this component's mount effect, then
-        // (synchronously, before this function's very first `await` below
-        // resolves) its cleanup — calling stop()/cleanup() on THIS still-
-        // in-flight attempt and closing this exact context. The remount's
-        // own startedRef guard (CallScreen.tsx) then blocks a *second*
-        // start() call (deliberately — the token fetch below reserves a
-        // real entitlement, so calling start() twice would burn two credits
-        // for what the user experiences as one call), so this original
-        // call's async chain is the only one there is, and it has to
-        // recover rather than being abandoned. If getUserMedia() (further
-        // below) finds this context already closed, it creates a fresh one
-        // and reassigns this same binding — which is exactly why this needs
-        // to be reassignable, so pc.ontrack's closure (captured further
-        // below, before that recovery can happen) sees the replacement too.
+        // (synchronously, before this function's first `await` resolves) its
+        // cleanup — closing this exact context. The remount's own startedRef
+        // guard (CallScreen.tsx) blocks a *second* start() call (a second call
+        // would reserve a second credit), so this original call's async chain
+        // is the only one there is and it has to recover rather than being
+        // abandoned: if getUserMedia() (below) finds this context closed it
+        // creates a fresh one and reassigns this same binding, which is why
+        // it must be reassignable (pc.ontrack's closure sees the replacement).
         let audioContext = new AudioContext();
         audioContextRef.current = audioContext;
         void ensureAudioContextRunning(audioContext, "on creation");
@@ -448,49 +638,68 @@ export function useRealtimeCall() {
         startRingTone(audioContext);
         startAmplitudeLoop();
 
-        const tokenRes = await fetch("/api/realtime/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ salesProfile, trainingProfile, scenario, identity }),
-        });
-        if (!tokenRes.ok) {
-          const body = await tokenRes.json().catch(() => null);
-          if (tokenRes.status === 403 && body?.error === "entitlement_required") {
-            setEntitlementExhausted(true);
-            setStatus("error");
-            // Not thrown, so this bypasses the catch block below — without
-            // this the ring tone and AudioContext started above would leak.
-            void cleanup();
-            return;
-          }
-          throw new Error(body?.error ?? "Failed to start call session.");
+        // The microphone is requested BEFORE anything is reserved. A denied,
+        // dismissed or missing microphone is the most common first-call
+        // failure, and it must never consume a trial call or a credit: the
+        // entitlement is only reserved (server-side, in /api/realtime/session)
+        // once we already hold a working mic and a WebRTC offer.
+        let mediaStream: MediaStream;
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: MIC_CONSTRAINTS });
+        } catch (micErr) {
+          const name = micErr instanceof DOMException ? micErr.name : "";
+          const message =
+            name === "NotAllowedError" || name === "SecurityError"
+              ? "Microphone access is blocked. Allow the microphone for this site in your browser, then start the call again. This didn't use up a call."
+              : name === "NotFoundError" || name === "OverconstrainedError"
+                ? "No microphone was found. Plug in or enable a microphone, then start the call again. This didn't use up a call."
+                : "The microphone couldn't be started. Check your browser's microphone permission, then try again. This didn't use up a call.";
+          console.error("Microphone unavailable", micErr);
+          setError(message);
+          setStatus("error");
+          void cleanup();
+          return;
         }
-        const {
-          value: ephemeralKey,
-          callId: newCallId,
-          deadlineAt,
-        } = (await tokenRes.json()) as { value: string; callId: string; deadlineAt: string };
-        // A valid token means this call is genuinely continuing — reset the
-        // one-shot cleanup guard in case the StrictMode phantom described
-        // above already tripped it. Without this, cleanup()'s own
-        // idempotency guard (needed so the disconnect tone can't play
-        // twice — see cleanup()'s comment) would make the REAL end-of-call
-        // cleanup silently no-op later: the peer connection would never
-        // close and the mic would stay hot even after the user hits End
-        // Call. Harmless to reset in production, where this never tripped
-        // early in the first place.
+        streamRef.current = mediaStream;
+
+        if (audioContext.state === "closed") {
+          // The StrictMode phantom closed the original context before we got
+          // here — replace it rather than abandoning the call.
+          console.warn(
+            "[realtime audio] AudioContext was closed before mic setup — creating a fresh one (expected once in dev mode from React StrictMode's double-invoked effects)."
+          );
+          // Clear the original ring-tone interval FIRST, while it's still
+          // reachable via the refs, or it would run forever against the
+          // closed context.
+          stopRingTone();
+          audioContext = new AudioContext();
+          audioContextRef.current = audioContext;
+          await ensureAudioContextRunning(audioContext, "replacement after getUserMedia");
+          ringStartTimeRef.current = performance.now();
+          startRingTone(audioContext);
+          // cleanup() (called by the phantom) also cancelled the amplitude
+          // loop — restart it so the noise gate and "You" bars keep working.
+          startAmplitudeLoop();
+        } else {
+          // The mic permission grant is itself a strong activation signal:
+          // one more awaited attempt at resuming the context before wiring the
+          // graph that carries audio to the peer connection.
+          await ensureAudioContextRunning(audioContext, "after getUserMedia");
+        }
+        // The StrictMode phantom (or nothing at all) may have tripped the
+        // one-shot cleanup guard; from here the call is genuinely continuing,
+        // and a stuck guard would make the REAL end-of-call cleanup no-op
+        // (mic left hot after End Call). Harmless to reset in production.
         cleanupStartedRef.current = false;
-        setCallId(newCallId);
-        startCountdown(deadlineAt);
 
         const pc = new RTCPeerConnection();
         pcRef.current = pc;
 
         const audioEl = document.createElement("audio");
         audioEl.autoplay = true;
-        // Muted until perceived pickup (triggerPickup, on dc "open" below)
-        // — the track/analyser wiring right below still happens immediately
-        // regardless, only the audible output is held back.
+        // Muted until perceived pickup (triggerPickup, on dc "open" below) —
+        // the track/analyser wiring still happens immediately, only the
+        // audible output is held back.
         audioEl.muted = true;
         audioElRef.current = audioEl;
         pc.ontrack = (e) => {
@@ -503,73 +712,22 @@ export function useRealtimeCall() {
           prospectDataArrayRef.current = new Uint8Array(prospectAnalyser.frequencyBinCount);
         };
 
-        // Bare `audio: true` leaves noise suppression up to browser/OS defaults,
-        // which aren't consistent — steady background noise (fan hum, AC) was
-        // reaching the VAD and transcription model unfiltered, causing false
-        // "speech started" triggers and garbled/hallucinated transcript text.
-        // Explicitly requesting these constraints suppresses it at the source.
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        });
-        streamRef.current = mediaStream;
-        if (audioContext.state === "closed") {
-          // The StrictMode phantom (see the `let audioContext` comment
-          // above) closed the original context before we got here —
-          // replace it rather than abandoning the call. Reassigning this
-          // same `audioContext` binding means pc.ontrack's closure (defined
-          // above, before this could be known) sees the replacement too.
-          console.warn(
-            "[realtime audio] AudioContext was closed before mic setup — creating a fresh one (expected once in dev mode from React StrictMode's double-invoked effects)."
-          );
-          // Clear the original ring-tone interval FIRST, while it's still
-          // reachable via the refs — otherwise calling startRingTone again
-          // below would overwrite ringIntervalRef/ringGainRef without ever
-          // clearing the original timer, leaving it running forever and
-          // throwing every cycle against the now-closed context.
-          stopRingTone();
-          audioContext = new AudioContext();
-          audioContextRef.current = audioContext;
-          await ensureAudioContextRunning(audioContext, "replacement after getUserMedia");
-          ringStartTimeRef.current = performance.now();
-          startRingTone(audioContext);
-          // cleanup() (called by the phantom above) also cancelled the
-          // amplitude loop's requestAnimationFrame chain — without
-          // restarting it here, the noise gate's gain would freeze at
-          // whatever it last was (silence or unfiltered, either way stuck)
-          // for the rest of the call, and the "You" bars would never move
-          // again. Safe to call again: the old rAF chain is already fully
-          // stopped, so this just starts a fresh one, not a second one.
-          startAmplitudeLoop();
-        } else {
-          // Second, awaited attempt — the mic permission grant the user just
-          // acted on is itself a strong activation signal, worth one more
-          // real try (not fire-and-forget this time) before wiring the graph
-          // that actually carries audio to the peer connection below.
-          await ensureAudioContextRunning(audioContext, "after getUserMedia");
-        }
-
         const userSource = audioContext.createMediaStreamSource(mediaStream);
         const userAnalyser = audioContext.createAnalyser();
         userAnalyser.fftSize = 256;
         userSource.connect(userAnalyser);
         userAnalyserRef.current = userAnalyser;
         userDataArrayRef.current = new Uint8Array(userAnalyser.frequencyBinCount);
-        // Time-domain buffer for the gate's RMS reading (see constants above)
-        // — length is fftSize here, not frequencyBinCount (that's only for
-        // the frequency-domain buffer above).
+        // Time-domain buffer for the gate's RMS reading — length is fftSize
+        // (frequencyBinCount is only for the frequency-domain buffer above).
         noiseGateDataArrayRef.current = new Uint8Array(userAnalyser.fftSize);
 
         // Route the mic through a gain node acting as a noise gate (opened/
-        // closed every frame in startAmplitudeLoop based on amplitude) before
-        // it ever reaches the peer connection — belt-and-suspenders on top of
-        // the browser-level noiseSuppression constraint above, since that
-        // constraint is advisory and not equally effective on every device.
+        // closed every frame in startAmplitudeLoop) before it reaches the
+        // peer connection — belt-and-suspenders on top of the browser-level
+        // noiseSuppression constraint, which isn't equally effective everywhere.
         const noiseGate = audioContext.createGain();
-        noiseGate.gain.value = NOISE_GATE_CLOSED_GAIN;
+        noiseGate.gain.value = NOISE_GATE_CONFIG.closedGain;
         userSource.connect(noiseGate);
         noiseGateRef.current = noiseGate;
 
@@ -582,8 +740,7 @@ export function useRealtimeCall() {
 
         dc.addEventListener("open", () => {
           // Whichever is later: the real connection (right now) or the
-          // minimum ring duration — never sooner than the real thing is
-          // ready, per triggerPickup's own guard against firing twice.
+          // minimum ring duration — never sooner than the real thing is ready.
           const elapsed = performance.now() - ringStartTimeRef.current;
           const remaining = RING_MIN_DURATION_MS - elapsed;
           if (remaining <= 0) {
@@ -604,32 +761,91 @@ export function useRealtimeCall() {
           console.debug("[realtime event]", event.type, event);
 
           switch (event.type) {
+            case "session.created":
+              sessionReadyRef.current = true;
+              maybeSendGreeting();
+              break;
             case "input_audio_buffer.speech_started":
               setSpeaking(true);
+              userSpeakingRef.current = true;
+              callerSpokeRef.current = true;
               break;
             case "input_audio_buffer.speech_stopped":
               setSpeaking(false);
+              userSpeakingRef.current = false;
+              // The commit event follows immediately; until it lands the turn
+              // is not yet registered as pending.
+              awaitingCommitRef.current = true;
+              notifySettle();
               break;
+            case "input_audio_buffer.committed": {
+              awaitingCommitRef.current = false;
+              const id = event.item_id;
+              if (id) {
+                pendingUserItemsRef.current.add(id);
+                // Placeholder that fixes this turn's position in the transcript.
+                updateTranscript((prev) =>
+                  prev.some((entry) => entry.id === id) ? prev : [...prev, { id, role: "user", text: "", final: false, timestamp: Date.now() }]
+                );
+              }
+              notifySettle();
+              break;
+            }
             case "conversation.item.input_audio_transcription.completed": {
               const id = event.item_id;
               if (id && typeof event.transcript === "string") {
-                setTranscript((prev) => upsertUserEntry(prev, id, event.transcript as string));
+                updateTranscript((prev) => upsertUserEntry(prev, id, event.transcript as string));
               }
+              if (id) pendingUserItemsRef.current.delete(id);
+              notifySettle();
               break;
             }
+            case "conversation.item.input_audio_transcription.failed": {
+              const id = event.item_id;
+              if (id) {
+                updateTranscript((prev) => upsertUserEntry(prev, id, ""));
+                pendingUserItemsRef.current.delete(id);
+              }
+              notifySettle();
+              break;
+            }
+            case "response.created":
+              responseActiveRef.current = true;
+              // While ending, never let a reply to the caller's last words start.
+              if (endingRef.current) sendEvent({ type: "response.cancel" });
+              break;
+            case "output_audio_buffer.started":
+              outputAudioActiveRef.current = true;
+              if (closingLineRequestedRef.current) closingLineStartedRef.current = true;
+              break;
+            case "output_audio_buffer.stopped":
+              outputAudioActiveRef.current = false;
+              // Goodbye finished playing: now (and only now) hang up. If a
+              // closing line was requested, earlier audio finishing doesn't count.
+              if (prospectEndPendingRef.current && (!closingLineRequestedRef.current || closingLineStartedRef.current)) {
+                if (prospectEndFallbackRef.current !== null) clearTimeout(prospectEndFallbackRef.current);
+                prospectEndFallbackRef.current = setTimeout(finishProspectEnd, 250);
+              }
+              break;
             case "response.output_audio_transcript.delta": {
               const id = event.item_id ?? event.response_id;
               if (id && typeof event.delta === "string") {
-                setTranscript((prev) => appendProspectDelta(prev, id, event.delta as string));
+                updateTranscript((prev) => appendProspectDelta(prev, id, event.delta as string));
               }
               break;
             }
             case "response.output_audio_transcript.done": {
               const id = event.item_id ?? event.response_id;
-              if (id) setTranscript((prev) => finalizeEntry(prev, id));
+              if (id) updateTranscript((prev) => finalizeEntry(prev, id));
               break;
             }
+            case "response.done":
+              responseActiveRef.current = false;
+              handleResponseDone(event);
+              break;
             case "error":
+              // A cancel racing with a response that just finished is harmless.
+              if ((event.error as { code?: string } | undefined)?.code === "response_cancel_not_active") break;
               console.error("Realtime API error event", event);
               setError(event.error?.message ?? "The prospect connection reported an error.");
               break;
@@ -641,42 +857,128 @@ export function useRealtimeCall() {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        const sdpRes = await fetch("https://api.openai.com/v1/realtime/calls", {
+        // The server brokers the handshake with OpenAI (so it holds the
+        // provider call id and can enforce the time cap) and reserves the
+        // entitlement — only now that a mic and an offer exist.
+        const sessionRes = await fetch("/api/realtime/session", {
           method: "POST",
-          body: offer.sdp,
-          headers: {
-            Authorization: `Bearer ${ephemeralKey}`,
-            "Content-Type": "application/sdp",
-          },
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ offerSdp: offer.sdp, trainingProfile, scenario, identity }),
         });
-
-        if (!sdpRes.ok) {
-          throw new Error("Failed to connect to the realtime call.");
+        if (!sessionRes.ok) {
+          const body = await sessionRes.json().catch(() => null);
+          if (sessionRes.status === 403 && body?.error === "entitlement_required") {
+            setEntitlementExhausted(true);
+            setStatus("error");
+            // Not thrown, so this bypasses the catch block below — without
+            // this the ring tone, mic and AudioContext would leak.
+            void cleanup();
+            return;
+          }
+          throw new Error(body?.error ?? "Failed to start call session.");
         }
+        const { answerSdp, callId: newCallId, deadlineAt } = (await sessionRes.json()) as {
+          answerSdp: string;
+          callId: string;
+          deadlineAt: string;
+        };
+        setCallId(newCallId);
+        startCountdown(deadlineAt);
 
-        const answerSdp = await sdpRes.text();
         await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+        connectTimeoutRef.current = setTimeout(() => {
+          connectTimeoutRef.current = null;
+          if (pickupTriggeredRef.current) return;
+          console.error("Realtime connection did not open in time");
+          setError("Couldn't connect to the call. Check your connection and try again.");
+          setStatus("error");
+          void cleanup();
+        }, CONNECT_TIMEOUT_MS);
       } catch (err) {
-        // Note: if this failure happens after mark_call_started already ran
-        // server-side (WebRTC negotiation failing post-token-issuance), the
-        // entitlement stays consumed and the call_sessions row stays
-        // 'started' — the stale-call sweep in get_entitlement_status()
-        // reconciles it to 'timeout' later. This is a rare edge case and a
-        // bookkeeping-only consequence, not an entitlement/security issue.
+        // A failure here happens AFTER the server reserved and started the
+        // call (only the browser-side setRemoteDescription can still fail);
+        // failures inside the server route release the entitlement themselves.
+        // The stale-call sweep in get_entitlement_status() reconciles the
+        // leftover 'started' row later.
         console.error("Failed to start realtime call", err);
         setError(err instanceof Error ? err.message : "Something went wrong starting the call.");
         setStatus("error");
         void cleanup();
       }
     },
-    [cleanup, startAmplitudeLoop, startCountdown, startRingTone, stopRingTone, triggerPickup]
+    [
+      cleanup,
+      finishProspectEnd,
+      handleResponseDone,
+      maybeSendGreeting,
+      notifySettle,
+      sendEvent,
+      startAmplitudeLoop,
+      startCountdown,
+      startRingTone,
+      stopRingTone,
+      triggerPickup,
+      updateTranscript,
+    ]
   );
 
+  // Tear down without waiting for anything (unmount, hard failure).
   const stop = useCallback(async () => {
     await cleanup();
     setStatus((prev) => (prev === "idle" ? prev : "ended"));
     setSpeaking(false);
   }, [cleanup]);
+
+  // Wait until the caller's last words are actually in the transcript: no
+  // speech in flight, no committed turn still awaiting transcription. Resolves
+  // as soon as that is true, with a ceiling so a lost event can't hang the UI.
+  const settleTranscript = useCallback(
+    () =>
+      new Promise<void>((resolve) => {
+        const isSettled = () =>
+          !userSpeakingRef.current && !awaitingCommitRef.current && pendingUserItemsRef.current.size === 0;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const finish = () => {
+          if (timer !== null) clearTimeout(timer);
+          settleWaitersRef.current.delete(check);
+          resolve();
+        };
+        const check = () => {
+          if (isSettled()) finish();
+        };
+        settleWaitersRef.current.add(check);
+        timer = setTimeout(finish, SETTLE_MAX_MS);
+        check();
+      }),
+    []
+  );
+
+  // The one way a call ends deliberately (End Call, time limit, or the
+  // prospect hanging up). Lets outstanding transcript events settle before
+  // teardown, drops any reply the prospect was mid-way through (it wasn't
+  // fully heard), and returns the final transcript.
+  const endCall = useCallback(async (): Promise<TranscriptEntry[]> => {
+    endingRef.current = true;
+    // Stop sending new audio. The server will finish committing whatever
+    // speech was already in flight; settleTranscript waits for that.
+    streamRef.current?.getAudioTracks().forEach((track) => (track.enabled = false));
+    // Anything the prospect is saying or about to say will not be heard.
+    if (responseActiveRef.current) sendEvent({ type: "response.cancel" });
+    if (audioElRef.current) audioElRef.current.muted = true;
+
+    await settleTranscript();
+
+    // Prospect turns still open at hang-up were cut off mid-reply.
+    updateTranscript((prev) =>
+      prev.map((entry) => (entry.role === "prospect" && !entry.final ? { ...entry, final: true, interrupted: true } : entry))
+    );
+    const finalTranscript = transcriptRef.current.filter((entry) => entry.text.trim().length > 0);
+
+    await cleanup();
+    setStatus((prev) => (prev === "idle" ? prev : "ended"));
+    setSpeaking(false);
+    return finalTranscript;
+  }, [cleanup, sendEvent, settleTranscript, updateTranscript]);
 
   return {
     status,
@@ -685,11 +987,13 @@ export function useRealtimeCall() {
     speaking,
     start,
     stop,
+    endCall,
     userAmplitudeRef,
     prospectAmplitudeRef,
     callId,
     remainingSeconds,
     timedOut,
     entitlementExhausted,
+    prospectEnded,
   };
 }
