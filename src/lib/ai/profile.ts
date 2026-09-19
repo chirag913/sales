@@ -1,5 +1,6 @@
 import { getOpenAIClient } from "@/lib/ai/client";
 import { TEXT_MODEL } from "@/lib/ai/models";
+import { normalizeTrainingProfile } from "@/lib/profile/normalize";
 import { TrainingProfile } from "@/lib/types";
 
 const SYSTEM_PROMPT = `You are a B2B cold-calling strategist helping someone set up a realistic
@@ -9,6 +10,16 @@ targeting, infer a useful training profile.
 Rules:
 - Infer ICP job titles, company size range, pain points, likely objections, a sales
   objective, and a typical prospect description from the input.
+- Two fields must never be confused:
+  - "offering" is what the CALLER sells (e.g. "appointment-setting services",
+    "commercial cleaning services"). Short noun phrase.
+  - "prospectIndustry" is what the PROSPECT'S company does (e.g. "dental practices",
+    "commercial property management firms"). Short noun phrase, 1-4 words, taken from who
+    the caller is targeting. It is NEVER the caller's own business: if someone runs an
+    appointment-setting agency that calls dental practices, offering is "appointment-setting
+    services" and prospectIndustry is "dental practices". If the input does not say who they
+    are targeting, infer the most likely target industry for the offering.
+  - icpTitles are job titles of people who work at companies in prospectIndustry.
 - Never invent clients, results, testimonials, offices, guarantees, credentials, pricing,
   or case studies. These are not part of your output and must never be referenced, even
   implicitly.
@@ -57,7 +68,8 @@ const trainingProfileSchema = {
   additionalProperties: false,
   properties: {
     market: { type: "string", enum: ["US", "UK", "Canada", "Australia", "Other"] },
-    service: { type: "string" },
+    offering: { type: "string" },
+    prospectIndustry: { type: "string" },
     icpTitles: { type: "array", items: { type: "string" } },
     companySizeRange: { type: "string" },
     additionalCriteria: { type: "array", items: { type: "string" } },
@@ -79,7 +91,8 @@ const trainingProfileSchema = {
       additionalProperties: false,
       properties: {
         market: { type: "boolean" },
-        service: { type: "boolean" },
+        offering: { type: "boolean" },
+        prospectIndustry: { type: "boolean" },
         icpTitles: { type: "boolean" },
         companySizeRange: { type: "boolean" },
         additionalCriteria: { type: "boolean" },
@@ -92,7 +105,8 @@ const trainingProfileSchema = {
       },
       required: [
         "market",
-        "service",
+        "offering",
+        "prospectIndustry",
         "icpTitles",
         "companySizeRange",
         "additionalCriteria",
@@ -107,7 +121,8 @@ const trainingProfileSchema = {
   },
   required: [
     "market",
-    "service",
+    "offering",
+    "prospectIndustry",
     "icpTitles",
     "companySizeRange",
     "additionalCriteria",
@@ -159,7 +174,7 @@ export async function generateTrainingProfile(
 
   const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from model");
-  return JSON.parse(raw) as TrainingProfile;
+  return normalizeTrainingProfile(JSON.parse(raw));
 }
 
 const REFINE_SYSTEM_PROMPT = `You are updating an existing cold-call training profile based on a
@@ -176,6 +191,9 @@ Rules:
   untouched.
 - Never invent clients, results, testimonials, offices, guarantees, credentials, pricing, or
   case studies.
+- "offering" is what the caller sells; "prospectIndustry" is what the prospect's company does.
+  Never copy one into the other. If prospectIndustry is empty in the current profile, fill it
+  from the ICP / typicalProspect (set its assumptions key to true).
 - If the instruction directly changes a field, set that field's key in "assumptions" to false
   (the user just told you this directly).
 - If applying the instruction forces you to infer a related change (e.g. removing one ICP
@@ -192,7 +210,7 @@ export async function refineTrainingProfile(
   const client = getOpenAIClient();
 
   const userMessage = [
-    `Current training profile:\n${JSON.stringify(profile, null, 2)}`,
+    `Current training profile:\n${JSON.stringify(normalizeTrainingProfile(profile), null, 2)}`,
     `Change request: ${instruction}`,
   ].join("\n\n");
 
@@ -214,5 +232,5 @@ export async function refineTrainingProfile(
 
   const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from model");
-  return JSON.parse(raw) as TrainingProfile;
+  return normalizeTrainingProfile(JSON.parse(raw));
 }

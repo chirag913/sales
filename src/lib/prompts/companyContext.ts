@@ -6,13 +6,16 @@ export interface CompanyContext {
 }
 
 /**
- * The truthful, non-inventable facts about the caller's company — shared
- * between the prospect prompt and the coach prompt so both stay in sync
- * with a single source of what's actually known.
+ * The truthful, non-inventable facts about the caller's company, for the
+ * COACH and SCORER (which judge whether the caller stayed truthful). The
+ * prospect prompt deliberately does NOT use this: a real prospect knows
+ * nothing about the caller's company beyond what the caller says on the call.
+ * (The underlying SalesProfile keys hasUSOffice/usClients keep their names
+ * so saved profiles still load; they now mean the prospect's own market.)
  */
 export function buildCompanyContext(salesProfile: SalesProfile, trainingProfile: TrainingProfile): CompanyContext {
   const offerLines = [
-    `What they sell: ${salesProfile.offer.whatYouSell || trainingProfile.service}`,
+    `What they sell: ${salesProfile.offer.whatYouSell || trainingProfile.offering}`,
     `Problem it solves: ${salesProfile.offer.problemSolved || "Not specified"}`,
     `Price: ${salesProfile.offer.price || "Not specified"}`,
     `Pricing model: ${salesProfile.offer.pricingModel || "Not specified"}`,
@@ -23,7 +26,7 @@ export function buildCompanyContext(salesProfile: SalesProfile, trainingProfile:
   const proofLines = salesProfile.proof.noClientsYet
     ? ["The company is new and does not yet have clients, case studies, or results to point to."]
     : [
-        salesProfile.proof.usClients && `US clients: ${salesProfile.proof.usClients}`,
+        salesProfile.proof.usClients && `Clients in the prospect's market: ${salesProfile.proof.usClients}`,
         salesProfile.proof.numberOfClients && `Number of clients: ${salesProfile.proof.numberOfClients}`,
         salesProfile.proof.caseStudies && `Case studies: ${salesProfile.proof.caseStudies}`,
         salesProfile.proof.results && `Results: ${salesProfile.proof.results}`,
@@ -34,7 +37,7 @@ export function buildCompanyContext(salesProfile: SalesProfile, trainingProfile:
 
   const factLines = [
     `Company based in: ${salesProfile.importantInfo.companyBasedIn || salesProfile.company.location || "Not specified"}`,
-    `US office: ${salesProfile.importantInfo.hasUSOffice || "Not specified"}`,
+    `Local office/presence in the prospect's country: ${salesProfile.importantInfo.hasUSOffice || "Not specified"}`,
     `Team location: ${salesProfile.importantInfo.teamLocation || "Not specified"}`,
     `How the service is delivered: ${salesProfile.importantInfo.deliveryMethod || "Not specified"}`,
     `Working hours / time zone: ${salesProfile.importantInfo.workingHours || "Not specified"}`,

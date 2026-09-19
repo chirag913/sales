@@ -28,13 +28,14 @@ export function applyTrainingProfileToSalesProfile(
     ...existing,
     offer: {
       ...existing.offer,
-      whatYouSell: training.service || existing.offer.whatYouSell,
+      whatYouSell: training.offering || existing.offer.whatYouSell,
     },
     targetCustomer: {
       ...existing.targetCustomer,
       jobTitle: training.icpTitles.join(", ") || existing.targetCustomer.jobTitle,
       companySize: training.companySizeRange || existing.targetCustomer.companySize,
       country: marketToCountry(training.market),
+      industry: training.prospectIndustry || existing.targetCustomer.industry,
       typicalProspect: training.typicalProspect || existing.targetCustomer.typicalProspect,
     },
     salesObjective: training.salesObjective,

@@ -56,7 +56,8 @@ const CALL_TYPE_TONE: Record<CallType, { chip: "cold" | "lukewarm" | "warm"; bor
 
 type EditingKey =
   | "market"
-  | "service"
+  | "offering"
+  | "prospectIndustry"
   | "icpTitles"
   | "companySize"
   | "painPoints"
@@ -239,24 +240,59 @@ export function ProfileReview({
       <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${refining ? "pointer-events-none opacity-60" : ""}`}>
         {callTypeCard}
 
-        <Card icon={Wrench} title="Service" assumption={editingKey !== "service" && profile.assumptions.service}>
-          {editingKey === "service" ? (
+        <Card icon={Wrench} title="What You Sell" assumption={editingKey !== "offering" && profile.assumptions.offering}>
+          {editingKey === "offering" ? (
             <>
               <input
                 type="text"
                 className={INPUT_CLASSES}
-                value={draft.service ?? profile.service}
-                onChange={(e) => setDraft((d) => ({ ...d, service: e.target.value }))}
+                value={draft.offering ?? profile.offering}
+                onChange={(e) => setDraft((d) => ({ ...d, offering: e.target.value }))}
               />
               <EditActions
-                onSave={() => saveEdit({ service: draft.service ?? profile.service }, ["service"])}
+                onSave={() => saveEdit({ offering: draft.offering ?? profile.offering }, ["offering"])}
                 onCancel={cancelEdit}
               />
             </>
           ) : (
             <>
-              <p className="text-lg text-zinc-900 dark:text-zinc-50">{profile.service}</p>
-              <EditButton onClick={() => startEdit("service", { service: profile.service })} />
+              <p className="text-lg text-zinc-900 dark:text-zinc-50">{profile.offering}</p>
+              <EditButton onClick={() => startEdit("offering", { offering: profile.offering })} />
+            </>
+          )}
+        </Card>
+
+        <Card
+          icon={Building2}
+          title="Industry You're Calling"
+          assumption={editingKey !== "prospectIndustry" && profile.assumptions.prospectIndustry}
+        >
+          {editingKey === "prospectIndustry" ? (
+            <>
+              <input
+                type="text"
+                className={INPUT_CLASSES}
+                placeholder="e.g. dental practices"
+                value={draft.prospectIndustry ?? profile.prospectIndustry}
+                onChange={(e) => setDraft((d) => ({ ...d, prospectIndustry: e.target.value }))}
+              />
+              <EditActions
+                onSave={() =>
+                  saveEdit({ prospectIndustry: (draft.prospectIndustry ?? profile.prospectIndustry).trim() }, ["prospectIndustry"])
+                }
+                onCancel={cancelEdit}
+              />
+            </>
+          ) : (
+            <>
+              {profile.prospectIndustry ? (
+                <p className="text-lg text-zinc-900 dark:text-zinc-50">{profile.prospectIndustry}</p>
+              ) : (
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  Not set yet — what kind of business are the people you call working at? (e.g. dental practices)
+                </p>
+              )}
+              <EditButton onClick={() => startEdit("prospectIndustry", { prospectIndustry: profile.prospectIndustry })} />
             </>
           )}
         </Card>

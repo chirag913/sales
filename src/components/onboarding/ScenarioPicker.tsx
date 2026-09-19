@@ -136,8 +136,9 @@ export function ScenarioPicker({
         <div className="flex min-w-0 items-center gap-3">
           <PhoneCall className="h-4 w-4 shrink-0 text-zinc-400 dark:text-zinc-500" aria-hidden />
           <p className="min-w-0 truncate text-sm text-zinc-600 dark:text-zinc-400">
-            <span className="font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Calling</span>{" "}
-            <span className="text-zinc-900 dark:text-zinc-50">{profile.service}</span> · {icpSummary}
+            <span className="font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Selling</span>{" "}
+            <span className="text-zinc-900 dark:text-zinc-50">{profile.offering}</span>
+            {profile.prospectIndustry ? <> to {profile.prospectIndustry}</> : null} · {icpSummary}
           </p>
         </div>
         <button
