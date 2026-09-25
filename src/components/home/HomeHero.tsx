@@ -1,8 +1,9 @@
-import Link from "next/link";
+import { TalkToUsLink, TryDemoLink } from "@/components/home/CtaLinks";
 import { DetailRow, Eyebrow, IllustrativeTag } from "@/components/home/parts";
 import { PRIMARY_LINK_CLASSES, SECONDARY_LINK_CLASSES } from "@/components/ui/linkButtonClasses";
 
-const STAGES = ["Lead received", "Calling", "Connected", "AI conversation", "Qualified lead"];
+// Five stages: globals.css animates exactly .stage-1 … .stage-5.
+const STAGES = ["Lead received", "BetterCallz calls", "AI conversation", "Qualified", "Sales team"];
 
 // Product visualization of the intended workflow: a lead arrives, is called,
 // is qualified, and the team gets a structured result. It is a static
@@ -22,7 +23,7 @@ function LeadFlowVisual() {
       </figcaption>
 
       <div className="px-5 pt-5">
-        <p className="font-mono text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Meta lead</p>
+        <p className="font-mono text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Meta / website lead</p>
         <div className="mt-2 flex items-center gap-3 rounded-xl border border-zinc-200 px-4 py-3 dark:border-zinc-800">
           <span
             aria-hidden
@@ -76,22 +77,18 @@ export function HomeHero() {
       <div aria-hidden className="bg-dot-grid absolute inset-0 -z-10" />
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-14 px-6 pb-20 pt-14 sm:pt-20 lg:flex-row lg:items-center lg:gap-16 lg:pb-28 lg:pt-24">
         <div className="max-w-xl text-center lg:flex-1 lg:text-left">
-          <Eyebrow>BetterCallz</Eyebrow>
+          <Eyebrow>AI Sales Calling</Eyebrow>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight text-balance text-zinc-900 dark:text-zinc-50 sm:text-5xl lg:text-[3.5rem] lg:leading-[1.05]">
             <span className="block">You already paid for the lead.</span>
             <span className="block">Make sure someone calls it.</span>
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-zinc-500 dark:text-zinc-400">
-            Every lead costs money to acquire. BetterCallz calls new and existing leads, has the first conversation,
-            qualifies their interest, and gives your sales team the people worth following up with.
+            BetterCallz calls new leads, has the first conversation, qualifies their intent, and gives your sales team the
+            context to follow up.
           </p>
           <div className="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center lg:justify-start">
-            <Link href="#get-started" className={`${PRIMARY_LINK_CLASSES} px-6 py-3 text-base`}>
-              Get a Custom AI Call
-            </Link>
-            <Link href="#instant-calling" className={`${SECONDARY_LINK_CLASSES} px-6 py-3 text-base`}>
-              See How It Works
-            </Link>
+            <TryDemoLink from="hero" className={`${PRIMARY_LINK_CLASSES} px-6 py-3 text-base`} />
+            <TalkToUsLink from="hero" className={`${SECONDARY_LINK_CLASSES} px-6 py-3 text-base`} />
           </div>
         </div>
 

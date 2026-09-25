@@ -1,14 +1,10 @@
 import { RevealOnScroll } from "@/components/landing/RevealOnScroll";
-import { DetailRow, IllustrativeTag, Section, SectionHeading } from "@/components/home/parts";
+import { TryDemoLink } from "@/components/home/CtaLinks";
+import { DetailRow, IllustrativeTag, Section, SectionHeading, WorkflowList } from "@/components/home/parts";
 import { ViewTracker } from "@/components/home/ViewTracker";
+import { PRIMARY_LINK_CLASSES } from "@/components/ui/linkButtonClasses";
 
-const STEPS = [
-  { n: "01", title: "Lead submits Meta form", text: "A new enquiry comes in from your ad." },
-  { n: "02", title: "BetterCallz receives the lead", text: "The lead's details reach BetterCallz the moment they're submitted." },
-  { n: "03", title: "AI starts the conversation", text: "The lead gets a call while their interest is at its freshest: right after the enquiry." },
-  { n: "04", title: "AI qualifies intent", text: "Budget, timeline and what they're actually looking for." },
-  { n: "05", title: "Sales team gets the context", text: "Not just a name and number: what they want, budget, timeline and the next step." },
-];
+const FLOW = ["Meta ad / website", "New lead", "BetterCallz", "AI conversation", "Qualified lead", "Sales team"];
 
 const MESSAGES: { from: "AI" | "LEAD"; text: string }[] = [
   { from: "AI", text: "Hi Rahul, you recently enquired about the 3 BHK options. Is now a good time for a quick conversation?" },
@@ -80,32 +76,25 @@ export function InstantCalling() {
       <ViewTracker event="instant_calling_view" />
       <SectionHeading
         eyebrow="Instant Lead Calling"
-        title="Reach the lead while they still remember enquiring."
-        description="Interest is freshest right after the enquiry, and the first conversation is where a lead becomes an opportunity or quietly doesn't. This is the workflow BetterCallz is built around: lead, conversation, qualification, context for your sales team."
+        title="Every new lead deserves a conversation."
+        description="When a new lead comes in, BetterCallz can call them and handle the first conversation before the lead goes cold."
       />
 
       <div className="mt-14 grid grid-cols-1 items-start gap-12 lg:grid-cols-2 lg:gap-16">
-        <ol className="flex flex-col">
-          {STEPS.map((step, i) => (
-            <li key={step.n} className="border-t border-zinc-200 py-5 first:border-t-0 first:pt-0 dark:border-zinc-800">
-              <RevealOnScroll delayMs={i * 60} className="flex gap-5">
-                <span className="font-mono text-sm font-medium text-teal-700 dark:text-teal-400">{step.n}</span>
-                <div>
-                  <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{step.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">{step.text}</p>
-                </div>
-              </RevealOnScroll>
-            </li>
-          ))}
-        </ol>
+        <RevealOnScroll className="flex flex-col items-start gap-10">
+          <WorkflowList steps={FLOW} />
+          <TryDemoLink from="instant_calling" className={`${PRIMARY_LINK_CLASSES} px-5 py-2.5`}>
+            See a Live AI Call →
+          </TryDemoLink>
+        </RevealOnScroll>
 
         <div>
           <RevealOnScroll>
             <ConversationMockup />
           </RevealOnScroll>
           <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
-            An illustrative example of the intended workflow, not a recording or a customer result. Ask for a custom AI call
-            below to see how it could work for your business.
+            An illustrative example of the intended workflow, not a recording or a customer result. Try the demo to hear a
+            real AI call.
           </p>
         </div>
       </div>

@@ -1,5 +1,7 @@
 import { RevealOnScroll } from "@/components/landing/RevealOnScroll";
+import { TalkToUsLink } from "@/components/home/CtaLinks";
 import { IllustrativeTag, Section, SectionHeading } from "@/components/home/parts";
+import { SECONDARY_LINK_CLASSES } from "@/components/ui/linkButtonClasses";
 import { ViewTracker } from "@/components/home/ViewTracker";
 
 // Outcomes are shown WITHOUT numbers on purpose: no share of a database is
@@ -46,7 +48,7 @@ function RecoveryFlow() {
 
       <div className="px-5 py-6">
         <div className="rounded-xl border border-zinc-200 px-4 py-4 dark:border-zinc-800">
-          <StageLabel>Existing leads</StageLabel>
+          <StageLabel>Existing database</StageLabel>
           <p className="mt-1 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">10,000</p>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">e.g. leads already sitting in your CRM or sheets</p>
         </div>
@@ -79,9 +81,9 @@ function RecoveryFlow() {
 
         <div className="rounded-xl border border-teal-600/40 bg-teal-50/60 px-4 py-4 dark:border-teal-400/30 dark:bg-teal-400/5">
           <p className="font-mono text-[11px] font-medium uppercase tracking-wider text-teal-700 dark:text-teal-400">
-            Recovered opportunities
+            Sales team
           </p>
-          <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">The interested prospects, handed to your sales team to follow up.</p>
+          <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">The leads worth following up with, handed to your team.</p>
         </div>
       </div>
     </figure>
@@ -97,21 +99,13 @@ export function LeadRecovery() {
           <div className="lg:sticky lg:top-28">
             <SectionHeading
               eyebrow="Lead Recovery"
-              title="Your CRM may already contain people who never said no."
-              description={
-                <>
-                  Some never answered. Some were busy, asked to be contacted later, stopped responding, or weren&apos;t ready
-                  at the time. Some were simply forgotten.
-                  <span className="mt-4 block">
-                    Give them another conversation. BetterCallz identifies who is still interested and hands those people to
-                    your sales team.
-                  </span>
-                </>
-              }
+              title="Don't let old leads disappear."
+              description="BetterCallz can call existing or missed leads, understand whether they are still interested, and surface the opportunities worth following up with."
             />
             <p className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">
               Results depend on your database and offer. We don&apos;t promise a recovery rate.
             </p>
+            <TalkToUsLink from="lead_recovery" className={`${SECONDARY_LINK_CLASSES} mt-8 px-5 py-2.5`} />
           </div>
 
           <RevealOnScroll>
