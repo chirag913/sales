@@ -4,7 +4,7 @@ import { RevealOnScroll } from "@/components/landing/RevealOnScroll";
 // sections around it.
 export function PositioningStatement() {
   return (
-    <section className="bg-zinc-900 text-white dark:border-y dark:border-zinc-800 dark:bg-zinc-950">
+    <section className="bg-zinc-900 text-white dark:border-y dark:border-zinc-800 dark:bg-zinc-900">
       <div className="mx-auto w-full max-w-6xl px-6 py-20 sm:py-28">
         <RevealOnScroll className="max-w-3xl">
           <h2 className="font-mono text-xs font-medium uppercase leading-relaxed tracking-[0.2em] text-teal-300">
