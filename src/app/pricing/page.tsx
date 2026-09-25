@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { HomeNav } from "@/components/home/HomeNav";
 import { ViewTracker } from "@/components/home/ViewTracker";
+import { WhatsAppButton } from "@/components/home/WhatsAppButton";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { PricingCards } from "@/components/pricing/PricingCards";
 import { PricingFactors } from "@/components/pricing/PricingFactors";
@@ -48,6 +49,7 @@ export default function PricingPage() {
         <PricingFinalCta from="pricing_final" />
       </main>
       <LandingFooter />
+      <WhatsAppButton />
     </div>
   );
 }

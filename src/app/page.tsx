@@ -16,6 +16,7 @@ import { PositioningStatement } from "@/components/home/PositioningStatement";
 import { PricingPreview } from "@/components/home/PricingPreview";
 import { ProductCards } from "@/components/home/ProductCards";
 import { RealEstate } from "@/components/home/RealEstate";
+import { WhatsAppButton } from "@/components/home/WhatsAppButton";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { PricingFinalCta } from "@/components/pricing/PricingFinalCta";
 
@@ -66,6 +67,7 @@ export default function HomePage() {
         <OutboundCallout />
       </main>
       <LandingFooter />
+      <WhatsAppButton />
     </div>
   );
 }

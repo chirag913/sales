@@ -23,7 +23,8 @@ export type AnalyticsEvent =
   | "pricing_cta_click"
   | "pricing_custom_cta_click"
   | "try_demo_click"
-  | "talk_to_us_click";
+  | "talk_to_us_click"
+  | "whatsapp_click";
 
 export function trackEvent(name: AnalyticsEvent, props?: Record<string, string | number | boolean>): void {
   if (typeof window === "undefined") return;

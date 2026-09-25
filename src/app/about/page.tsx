@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { FounderSignature } from "@/components/home/FounderSignature";
+import { WhatsAppButton } from "@/components/home/WhatsAppButton";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { HomeNav } from "@/components/home/HomeNav";
 
@@ -61,6 +62,7 @@ export default function AboutPage() {
         </div>
       </main>
       <LandingFooter />
+      <WhatsAppButton />
     </div>
   );
 }
