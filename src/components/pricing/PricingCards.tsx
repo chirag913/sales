@@ -1,3 +1,4 @@
+import { CONTACT_HREF } from "@/components/home/CtaLinks";
 import { TrackedLink } from "@/components/home/TrackedLink";
 import { RevealOnScroll } from "@/components/landing/RevealOnScroll";
 import { PRIMARY_LINK_CLASSES, SECONDARY_LINK_CLASSES } from "@/components/ui/linkButtonClasses";
@@ -24,7 +25,8 @@ interface Plan {
   custom?: boolean;
 }
 
-const PLANS: Plan[] = [
+// Also read by the home page pricing preview.
+export const PLANS: Plan[] = [
   {
     id: "starter",
     name: "Starter",
@@ -32,7 +34,7 @@ const PLANS: Plan[] = [
     priceSuffix: "/month",
     volume: "Up to 500 new leads / month",
     features: STANDARD_FEATURES,
-    cta: "Get Started",
+    cta: "Talk to Us →",
   },
   {
     id: "growth",
@@ -41,7 +43,7 @@ const PLANS: Plan[] = [
     priceSuffix: "/month",
     volume: "Up to 1,000 new leads / month",
     features: STANDARD_FEATURES,
-    cta: "Get Started",
+    cta: "Talk to Us →",
     recommended: true,
   },
   {
@@ -51,7 +53,7 @@ const PLANS: Plan[] = [
     priceSuffix: "/month",
     volume: "Up to 2,500 new leads / month",
     features: [...STANDARD_FEATURES, "Higher-volume calling"],
-    cta: "Talk to Us",
+    cta: "Talk to Us →",
   },
   {
     id: "high-volume",
@@ -65,7 +67,7 @@ const PLANS: Plan[] = [
       "Custom reporting",
       "Dedicated implementation",
     ],
-    cta: "Talk to Sales",
+    cta: "Talk to Us →",
     custom: true,
   },
 ];
@@ -142,8 +144,8 @@ function PlanCard({ plan }: { plan: Plan }) {
       </ul>
 
       <TrackedLink
-        href="/#get-started"
-        event="pricing_cta_clicked"
+        href={CONTACT_HREF}
+        event={plan.custom ? "pricing_custom_cta_click" : "pricing_cta_click"}
         eventProps={{ plan: plan.id }}
         className={`${ctaClasses} mt-7 w-full`}
       >

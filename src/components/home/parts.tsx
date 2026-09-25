@@ -93,3 +93,39 @@ export function DetailRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function FlowArrow() {
+  return (
+    <span aria-hidden className="mx-1 shrink-0 text-zinc-300 dark:text-zinc-700 sm:mx-2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden sm:block">
+        <path d="M5 12h14M13 6l6 6-6 6" />
+      </svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="block sm:hidden">
+        <path d="M12 5v14M6 13l6 6 6-6" />
+      </svg>
+    </span>
+  );
+}
+
+// The core product flow as a row of labelled boxes joined by arrows. Stacks
+// vertically on phones, wraps on mid-size screens; the last step is the accent.
+export function FlowRow({ steps, className = "" }: { steps: string[]; className?: string }) {
+  return (
+    <ol className={`flex flex-col items-center sm:flex-row sm:flex-wrap sm:justify-center sm:gap-y-3 ${className}`}>
+      {steps.map((step, i) => (
+        <li key={step} className="flex flex-col items-center sm:flex-row">
+          {i > 0 && <FlowArrow />}
+          <span
+            className={`rounded-xl border px-5 py-3 font-mono text-xs font-medium uppercase tracking-wider ${
+              i === steps.length - 1
+                ? "border-teal-600 text-teal-700 dark:border-teal-400 dark:text-teal-400"
+                : "border-zinc-200 text-zinc-700 dark:border-zinc-800 dark:text-zinc-300"
+            }`}
+          >
+            {step}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}

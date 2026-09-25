@@ -10,7 +10,7 @@ import { PricingFlow } from "@/components/pricing/PricingFlow";
 import { PricingHero } from "@/components/pricing/PricingHero";
 import { PricingWorkflow } from "@/components/pricing/PricingWorkflow";
 
-const TITLE = "BetterCallz Pricing — AI Calling for Your Sales Leads";
+const TITLE = "BetterCallz Pricing — AI Calling for Sales Leads";
 const DESCRIPTION =
   "See BetterCallz pricing for AI lead calling, qualification and sales handoff. Plans start at ₹19,999/month, with custom pricing for high-volume teams.";
 
@@ -45,7 +45,7 @@ export default function PricingPage() {
         <PricingFlow />
         <PricingWorkflow />
         <PricingFaq />
-        <PricingFinalCta />
+        <PricingFinalCta from="pricing_final" />
       </main>
       <LandingFooter />
     </div>

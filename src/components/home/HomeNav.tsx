@@ -7,6 +7,7 @@ import { Logo } from "@/components/ui/Logo";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { PRIMARY_LINK_CLASSES } from "@/components/ui/linkButtonClasses";
 import { trackEvent } from "@/lib/analytics";
+import { TalkToUsLink, TryDemoLink } from "@/components/home/CtaLinks";
 
 interface NavItem {
   label: string;
@@ -22,6 +23,8 @@ const USE_CASES: NavItem[] = [
   { label: "Real Estate", href: "/#real-estate" },
   { label: "Lead-Driven Businesses", href: "/#industries" },
 ];
+
+const HOW_IT_WORKS: NavItem = { label: "How It Works", href: "/#how-it-works" };
 
 const LINK = "text-sm text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50";
 
@@ -109,27 +112,28 @@ export function HomeNav() {
           : "border-transparent bg-white/40 backdrop-blur-sm dark:bg-black/40"
       }`}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 sm:gap-4 sm:px-6">
         <Link href="/" aria-label="BetterCallz home" className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           <Logo />
         </Link>
 
         <nav aria-label="Main" className="hidden items-center gap-7 lg:flex">
-          <Dropdown label="Products" items={PRODUCTS} />
+          <Dropdown label="Product" items={PRODUCTS} />
+          <Link href={HOW_IT_WORKS.href} className={LINK}>
+            {HOW_IT_WORKS.label}
+          </Link>
           <Dropdown label="Use Cases" items={USE_CASES} />
           <Link href="/pricing" className={LINK}>
             Pricing
           </Link>
+          <TalkToUsLink from="nav" className={LINK}>
+            Contact
+          </TalkToUsLink>
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
-          {/* Wrapper, not `hidden` on the link: PRIMARY_LINK_CLASSES sets display itself. */}
-          <span className="hidden sm:block">
-            <Link href="/#get-started" className={PRIMARY_LINK_CLASSES}>
-              Get a Custom AI Call
-            </Link>
-          </span>
+          <TryDemoLink from="nav" className={`${PRIMARY_LINK_CLASSES} whitespace-nowrap`} />
           <button
             type="button"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -146,7 +150,7 @@ export function HomeNav() {
       {mobileOpen && (
         <nav id="mobile-menu" aria-label="Mobile" className="border-t border-zinc-200/70 bg-white px-6 pb-6 pt-4 dark:border-zinc-800 dark:bg-black lg:hidden">
           <div className="flex flex-col gap-1">
-            {[...PRODUCTS, ...USE_CASES].map((item) => (
+            {[...PRODUCTS, HOW_IT_WORKS, ...USE_CASES].map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -163,14 +167,19 @@ export function HomeNav() {
             >
               Pricing
             </Link>
+            <TalkToUsLink
+              from="nav_mobile"
+              onClick={() => setMobileOpen(false)}
+              className="rounded-lg px-2 py-3 text-base text-zinc-800 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-900"
+            >
+              Contact
+            </TalkToUsLink>
           </div>
-          <Link
-            href="/#get-started"
+          <TryDemoLink
+            from="nav_mobile"
             onClick={() => setMobileOpen(false)}
             className={`${PRIMARY_LINK_CLASSES} mt-4 w-full py-3 text-base`}
-          >
-            Get a Custom AI Call
-          </Link>
+          />
         </nav>
       )}
     </header>

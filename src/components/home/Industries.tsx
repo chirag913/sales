@@ -1,31 +1,22 @@
 import { RevealOnScroll } from "@/components/landing/RevealOnScroll";
+import { TryDemoLink } from "@/components/home/CtaLinks";
 import { Section, SectionHeading } from "@/components/home/parts";
 
 const SECONDARY = [
-  {
-    label: "Education",
-    situation: "A prospective student comparing programs.",
-    text: "While the enquiry is still active, a timely conversation helps you understand what they're looking for and whether the program fits.",
-  },
-  {
-    label: "Healthcare",
-    situation: "An appointment or treatment enquiry.",
-    text: "A timely, relevant response helps you understand what they need and get them to the right next step.",
-  },
+  { label: "Education", text: "Respond to admission enquiries quickly and identify serious applicants." },
   {
     label: "High-ticket services",
-    situation: "A consultation request from someone comparing providers.",
-    text: "They may be weighing price and fit. A first conversation helps you see who is serious before your team spends time on it.",
+    text: "Have the first conversation before your sales team spends time qualifying.",
   },
 ];
 
-// Deliberately short: one primary market and three secondary ones. The
+// Deliberately short: one primary market and two secondary ones. The
 // product is focused, and this page doesn't claim traction in any of them.
 export function Industries() {
   return (
     <section className="border-y border-zinc-200/70 bg-white dark:border-zinc-900 dark:bg-zinc-950/40">
       <Section id="industries">
-        <SectionHeading eyebrow="Who it's for" title="Built for lead-driven businesses." />
+        <SectionHeading eyebrow="Built for lead-driven businesses" title="One problem. Many sales teams." />
 
         <div className="mt-12 grid grid-cols-1 gap-5 lg:grid-cols-5">
           <RevealOnScroll className="lg:col-span-2">
@@ -33,24 +24,25 @@ export function Industries() {
               <div>
                 <p className="font-mono text-xs font-medium uppercase tracking-[0.2em] text-teal-300">Primary</p>
                 <h3 className="mt-3 text-2xl font-semibold tracking-tight">Real Estate</h3>
-                <p className="mt-3 leading-relaxed text-zinc-300">
-                  Project enquiries, buyer qualification and site visits, where each lead is worth a lot and the window to reach
-                  them is short.
+                <p className="mt-3 text-lg leading-relaxed text-zinc-200">
+                  Call and qualify every property enquiry before your salesperson follows up.
                 </p>
               </div>
-              <a href="#real-estate" className="mt-8 text-sm font-medium text-teal-300 underline-offset-4 hover:underline">
-                See the example →
-              </a>
+              <TryDemoLink
+                from="industries_real_estate"
+                className="mt-8 inline-flex items-center justify-center self-start rounded-xl bg-white px-5 py-2.5 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-200"
+              >
+                See a Real Estate AI Call →
+              </TryDemoLink>
             </div>
           </RevealOnScroll>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:col-span-3">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:col-span-3">
             {SECONDARY.map((item, i) => (
               <RevealOnScroll key={item.label} delayMs={(i + 1) * 80}>
                 <div className="h-full rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-                  <p className="font-mono text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{item.label}</p>
-                  <h3 className="mt-2 text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{item.situation}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">{item.text}</p>
+                  <h3 className="font-mono text-xs font-medium uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">{item.label}</h3>
+                  <p className="mt-3 text-lg font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50">{item.text}</p>
                 </div>
               </RevealOnScroll>
             ))}
