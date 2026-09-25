@@ -18,7 +18,9 @@ export type AnalyticsEvent =
   | "custom_demo_form_started"
   | "custom_demo_requested"
   | "talk_to_team_requested"
-  | "outbound_clicked";
+  | "outbound_clicked"
+  | "pricing_view"
+  | "pricing_cta_clicked";
 
 export function trackEvent(name: AnalyticsEvent, props?: Record<string, string | number | boolean>): void {
   if (typeof window === "undefined") return;

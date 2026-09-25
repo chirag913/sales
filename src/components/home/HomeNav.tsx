@@ -117,6 +117,9 @@ export function HomeNav() {
         <nav aria-label="Main" className="hidden items-center gap-7 lg:flex">
           <Dropdown label="Products" items={PRODUCTS} />
           <Dropdown label="Use Cases" items={USE_CASES} />
+          <Link href="/pricing" className={LINK}>
+            Pricing
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
@@ -153,6 +156,13 @@ export function HomeNav() {
                 {item.label}
               </Link>
             ))}
+            <Link
+              href="/pricing"
+              onClick={() => setMobileOpen(false)}
+              className="rounded-lg px-2 py-3 text-base text-zinc-800 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-900"
+            >
+              Pricing
+            </Link>
           </div>
           <Link
             href="/#get-started"
